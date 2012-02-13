@@ -54,14 +54,14 @@ end
 def minimize_output_browser
   puts "*** minimizing output"
   `cp ./closure-compiler.jar ./dist/browser/`
-#  `cd ./dist/browser && java -jar closure-compiler.jar --compilation_level=ADVANCED_OPTIMIZATIONS --js=rdf_store.js > rdf_store_min.js`
-  `cd ./dist/browser && java -jar closure-compiler.jar --compilation_level=SIMPLE_OPTIMIZATIONS --js=rdf_store.js > rdf_store_min.js`
-  `cp ./dist/browser/rdf_store_min.js ./dist/browser/rdf_store_min.js.bak`
-  `cd ./dist/browser && gzip -9 rdf_store_min.js`
-  `mv ./dist/browser/rdf_store_min.js.bak ./dist/browser/rdf_store_min.js`
+#  `cd ./dist/browser && java -jar closure-compiler.jar --compilation_level=ADVANCED_OPTIMIZATIONS --js=micrograph.js > micrograph_min.js`
+  `cd ./dist/browser && java -jar closure-compiler.jar --compilation_level=SIMPLE_OPTIMIZATIONS --js=micrograph.js > micrograph_min.js`
+  `cp ./dist/browser/micrograph_min.js ./dist/browser/micrograph_min.js.bak`
+  `cd ./dist/browser && gzip -9 micrograph_min.js`
+  `mv ./dist/browser/micrograph_min.js.bak ./dist/browser/micrograph_min.js`
   `rm ./dist/browser/closure-compiler.jar`
-  `cp ./dist/browser/rdf_store*.js ./browsertests/non_persistent/`
-  `cp ./dist/browser/rdf_store*.js ./browsertests/workers/resources/public/`
+  `cp ./dist/browser/micrograph*.js ./browsertests/non_persistent/`
+  `cp ./dist/browser/micrograph*.js ./browsertests/workers/resources/public/`
 end
 
 def minimize_output_browser_persistent
@@ -97,7 +97,7 @@ end
 def write_nodejs_coda(of)
   js_code =<<__END
 try{
-  module.exports = Store;
+  module.exports = Micrograph;
 }catch(e){}
 })();
 __END
@@ -382,6 +382,9 @@ def process_file_for_browser(of, f)
     if (line =~ /exports\.[a-zA-Z0-9]+ *= *\{ *\};/) == 0
       puts " * modifying: #{line} -> var #{line.split("exports.")[1]}"
       of << "var #{line.split('exports.')[1]}"
+    elsif (line =~ /exports.MicrographQuery/) == 0
+      puts " * modifying MicrographQuery export"
+      of << "var MicrographQuery = function(#{line.split('MicrographQuery = function(')[1]}"
     elsif (line =~/var QueryPlan = require/) == 0
       of << "var QueryPlan = QueryPlanDPSize;"
     elsif (line =~ /var QueryEngine = require/) == 0
@@ -465,7 +468,7 @@ __END
 end
 
 def process_files_for_browser
-  File.open("./dist/browser/rdf_store.js", "w") do |of|
+  File.open("./dist/browser/micrograph.js", "w") do |of|
     
     if BUILD_CONFIGURATION[:browser][:load_jquery]
       File.open("./src/js-communication/src/jquery_ajax.js", "r") do |f|

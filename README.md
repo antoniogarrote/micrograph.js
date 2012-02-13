@@ -17,7 +17,7 @@ Graph data layer for client JS applications.
      		     name: 'Karl',
      		     surname: 'Popper',
      		     author: {$type: 'Book',
-     		     	  title: 'The Open Society and its Enemies'}}]).
+     		     	      title: 'The Open Society and its Enemies'}}]).
      	    where({author$in: {surname: 'Wittgenstein'}}).
             removeNodes(function(removed) {
      		        assert(removed === 2);

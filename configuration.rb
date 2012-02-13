@@ -12,20 +12,15 @@ BUILD_CONFIGURATION = {
                  "./src/js-rdf-persistence/src/quad_backend.js",
                  "./src/js-rdf-persistence/src/lexicon.js",
                  "./src/js-communication/src/ajax_transport.js",
-                 "./src/js-communication/src/jsonld_parser.js",
-                 "./src/js-communication/src/rdf_loader.js",
                  "./src/js-sparql-parser/src/abstract_query_tree.js",
-                 "./src/js-sparql-parser/src/sparql_parser.js",
-                 "./src/js-communication/src/n3_parser.js",
-                 "./src/js-query-engine/src/rdf_js_interface.js",
                  "./src/js-query-engine/src/query_filters.js",
-                 #"./src/js-query-engine/src/query_plan.js",
                  "./src/js-query-engine/src/query_plan_sync_dpsize.js",
                  "./src/js-query-engine/src/query_engine.js",
                  "./src/js-query-engine/src/callbacks.js",
                  "./src/js-connection/src/rdfstore_client.js",
-                 "./src/js-store/src/store.js",
-                 "./src/js-connection/src/rdfstore_worker.js"                 
+                 "./src/micrograph/src/micrograph_ql.js",
+                 "./src/micrograph/src/micrograph_query.js",
+                 "./src/micrograph/src/micrograph.js"
                 ]
   },
   

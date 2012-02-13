@@ -52,6 +52,8 @@ var Micrograph = function(options, callback) {
 };
 exports.Micrograph = Micrograph;
 
+Micrograph.VERSION = "0.1.0";
+
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
 Micrograph.create = function() {
