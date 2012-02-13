@@ -115,48 +115,41 @@ Micrograph.prototype.load = function() {
 	throw "Data to be loaded and an optional callback function must be specified";
     }
 
-    if(mediaType === 'remote') {
-        data = this.rdf.createNamedNode(data);
-        var query = "LOAD <"+data.valueOf()+"> INTO GRAPH <"+graph.valueOf()+">";
-
-        this.engine.execute(query, callback);
-    } else {
-	if(typeof(data) === "object") {
-	    if(data.constructor !== Array) {
-		data = [data];
-	    }
-	    var quads;
-	    var that = this;
-
-	    //Utils.repeat(0,data.length, function(k,env) {
-	    // 	var floop = arguments.callee;
-	    for(var i=0; i<data.length; i++) {
-		quads = MicrographQL.parseJSON(data[i],graph);
-
-		//console.log("LOAD");
-		//console.log(quads);
-
-		that.engine.batchLoad(quads,function(){ 
-		    //k(floop,env); 
-		});
-	    }
-	    //}, function() {
-	     	callback(data);
-	    //});
-	} else {
-
-            var parser = this.engine.rdfLoader.parsers[mediaType];
-
-            var that = this;
-
-            this.engine.rdfLoader.tryToParse(parser, {'token':'uri', 'value':graph.valueOf()}, data, function(success, quads) {
-		if(success) {
-                    that.engine.batchLoad(quads,callback);
-		} else {
-                    callback(success, quads);
-		}
-            });
+    if(typeof(data) === "object") {
+	if(data.constructor !== Array) {
+	    data = [data];
 	}
+	var quads;
+	var that = this;
+
+	//Utils.repeat(0,data.length, function(k,env) {
+	// 	var floop = arguments.callee;
+	for(var i=0; i<data.length; i++) {
+	    quads = MicrographQL.parseJSON(data[i],graph);
+
+	    //console.log("LOAD");
+	    //console.log(quads);
+
+	    that.engine.batchLoad(quads,function(){ 
+		//k(floop,env); 
+	    });
+	}
+	//}, function() {
+	callback(data);
+	//});
+    } else {
+
+        var parser = this.engine.rdfLoader.parsers[mediaType];
+
+        var that = this;
+
+        this.engine.rdfLoader.tryToParse(parser, {'token':'uri', 'value':graph.valueOf()}, data, function(success, quads) {
+	    if(success) {
+                that.engine.batchLoad(quads,callback);
+	    } else {
+                callback(success, quads);
+	    }
+        });
     }
 
     return this;
@@ -170,13 +163,3 @@ Micrograph.prototype.save = function(json,cb) {
     });
     return this;
 };
-
-/*
-Micrograph.prototype.remove = function(query) {
-    console.log("REMOVING!");
-    var queryObj = this._parseModify(query);
-    queryObj.setStore(this);
-    queryObj.setKind('delete');
-    return queryObj;
-};
-*/

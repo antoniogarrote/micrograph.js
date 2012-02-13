@@ -1,12 +1,14 @@
 // imports
 var MicrographQL = require('./micrograph_ql.js').MicrographQL;
 var Utils = require("./../../js-trees/src/utils").Utils;
+/*
 var sys = null;
 try {
     sys = require("util");
 } catch(e) {
     sys = require("sys");
 }
+*/
 
 // Query object
 exports.MicrographQuery = function(template) {
@@ -507,7 +509,7 @@ MicrographQuery.prototype._parseModifyNodes = function(object, callback) {
 
 		that.store.execute(pattern.query, function(success,res) {});
 
-	    })
+	    });
 	};
     });
 

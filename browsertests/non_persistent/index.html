@@ -1,17 +1,16 @@
 <html>
   <head>
-    <title>Example Test Suite</title>
+    <title>Micrograph.js Test Suite</title>
     <link rel="stylesheet" href="nodeunit.css" type="text/css" />
     <script src="nodeunit.js"></script>
-    <script src="store.js"></script>
-    <script src="rdf_store.js"></script>
+    <script src="micrograph.js"></script>
+    <script src="micrograph_suite.js"></script>
   </head>
   <body>
-    <h1 id="nodeunit-header">RDFStore-JS Non Persistent Storage
-    Version Smoke Tests</h1>
+    <h1 id="nodeunit-header">Micrograph Smoke Tests</h1>
     <script>
       nodeunit.run({
-        'Store': suite_store
+        'Micrograph': micrograph_suite
       });
     </script>
   </body>

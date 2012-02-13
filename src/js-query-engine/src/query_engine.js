@@ -8,8 +8,6 @@ var Utils = require("./../../js-trees/src/utils").Utils;
 var QuadIndexCommon = require("./../../js-rdf-persistence/src/quad_index_common").QuadIndexCommon;
 var QueryPlan = require("./query_plan_sync_dpsize").QueryPlanDPSize;
 var QueryFilters = require("./query_filters").QueryFilters;
-var RDFJSInterface = require("./rdf_js_interface").RDFJSInterface;
-var RDFLoader = require("../../js-communication/src/rdf_loader").RDFLoader;
 var Callbacks = require("./callbacks.js").Callbacks;
 
 QueryEngine.QueryEngine = function(params) {
@@ -21,7 +19,6 @@ QueryEngine.QueryEngine = function(params) {
         // list of namespaces that will be automatically added to every query
         this.defaultPrefixes = {};
         this.abstractQueryTree = new AbstractQueryTree.AbstractQueryTree();
-        this.rdfLoader = new RDFLoader.RDFLoader(params['communication']);
         this.callbacksBackend = new Callbacks.CallbacksBackend(this);
     }
 };
@@ -638,65 +635,6 @@ QueryEngine.QueryEngine.prototype.executeQuery = function(syntaxTree, callback, 
                 callback(false, result);
             }
         });
-    } else if(aqt.kind === 'construct') {
-        aqt.projection = [{"token": "variable", "kind": "*"}];
-        that = this;
-        this.executeSelect(aqt, queryEnv, defaultDataset, namedDataset, function(success, result){
-            if(success) {
-                if(success) {              
-                    var result = that.denormalizeBindingsList(result, queryEnv);
-                    if(result != null) { 
-                        var graph = new RDFJSInterface.Graph();
-                            
-                        // CONSTRUCT WHERE {} case
-                        if(aqt.template == null) {
-                            aqt.template = {triplesContext: aqt.pattern};
-                        }
-                        var blankIdCounter = 1;
-			var toClear = [];
-                        for(var i=0; i<result.length; i++) {
-                            var bindings = result[i];
-			    for(var j=0; j<toClear.length; j++)
-				delete toClear[j].valuetmp;
-
-                            for(var j=0; j<aqt.template.triplesContext.length; j++) {
-                                // fresh IDs for blank nodes in the construct template
-                                var components = ['subject', 'predicate', 'object'];
-                                var tripleTemplate = aqt.template.triplesContext[j];                                    
-                                for(var p=0; p<components.length; p++) {
-                                    var component = components[p];
-                                    if(tripleTemplate[component].token === 'blank') {
-					if(tripleTemplate[component].valuetmp && tripleTemplate[component].valuetmp != null) {
-					} else {
-					    var blankId = "_:b"+blankIdCounter;
-					    blankIdCounter++;
-					    tripleTemplate[component].valuetmp = blankId;
-					    toClear.push(tripleTemplate[component]);
-					}
-				    }
-                                }
-                                var s = RDFJSInterface.buildRDFResource(tripleTemplate.subject,bindings,that,queryEnv);
-                                var p = RDFJSInterface.buildRDFResource(tripleTemplate.predicate,bindings,that,queryEnv);
-                                var o = RDFJSInterface.buildRDFResource(tripleTemplate.object,bindings,that,queryEnv);
-                                if(s!=null && p!=null && o!=null) {
-                                    var triple = new RDFJSInterface.Triple(s,p,o);
-                                    graph.add(triple);
-                                    //} else {
-                                    //    return callback(false, "Error creating output graph")
-                                }
-                            }
-                        }
-                        callback(true,graph);
-                    } else {
-                        callback(false, result);
-                    }
-                } else {
-                    callback(false, result);
-                }
-            } else {
-                callback(false, result);
-            }
-        });
     }
 };
 
@@ -1279,26 +1217,6 @@ QueryEngine.QueryEngine.prototype.executeUpdate = function(syntaxTree, callback)
             this._executeModifyQuery(aqt, queryEnv, callback);
         } else if(aqt.kind === 'create') {
             callback(true);
-        } else if(aqt.kind === 'load') {
-            var graph = {'uri': Utils.lexicalFormBaseUri(aqt.sourceGraph, queryEnv)};
-            if(aqt.destinyGraph != null) {
-                graph = {'uri': Utils.lexicalFormBaseUri(aqt.destinyGraph, queryEnv)};
-            }
-            var that = this;
-            this.rdfLoader.load(aqt.sourceGraph.value, graph, function(success, result){
-                if(success == false) {
-                    console.log("Error loading graph");
-                    console.log(result);
-                    callback(false, "error batch loading quads");
-                } else {
-                    var result = that.batchLoad(result);
-                    callback(result!=null, result||"error batch loading quads");
-                }
-            });
-        } else if(aqt.kind === 'drop') {
-            this._executeClearGraph(aqt.destinyGraph, queryEnv, callback);
-        } else if(aqt.kind === 'clear') {
-            this._executeClearGraph(aqt.destinyGraph, queryEnv, callback);
         } else {
             throw new Error("not supported execution unit");
         }
@@ -1684,54 +1602,6 @@ QueryEngine.QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv) 
     }
 };
 
-QueryEngine.QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, callback) {
-    if(destinyGraph === 'default') {
-        this.execute("DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }", callback);
-    } else if(destinyGraph === 'named') {
-        var that = this;
-        var graphs = this.lexicon.registeredGraphs(true);
-        if(graphs!=null) {
-            var foundErrorDeleting = false;
-            Utils.repeat(0, graphs.length,function(k,env) {
-                var graph = graphs[env._i];
-                var floop = arguments.callee;
-                if(!foundErrorDeleting) {
-                    that.execute("DELETE { GRAPH <"+graph+"> { ?s ?p ?o } } WHERE { GRAPH <"+graph+"> { ?s ?p ?o } }", function(success, results){
-                        foundErrorDeleting = !success;
-                        k(floop, env);
-                    });
-                } else {
-                    k(floop, env);
-                }
-            }, function(env) {
-                callback(!foundErrorDeleting);
-            });
-        } else {
-            callback(false, "Error deleting named graphs");
-        }
-    } else if(destinyGraph === 'all') {
-        var that = this;
-        this.execute("CLEAR DEFAULT", function(success, result) {
-            if(success) {
-                that.execute("CLEAR NAMED", callback);
-            } else {
-                callback(false,result);
-            }
-        });
-    } else {
-        // destinyGraph is an URI
-        if(destinyGraph.token == 'uri') {
-            var graphUri = Utils.lexicalFormBaseUri(destinyGraph,queryEnv);
-            if(graphUri != null) {
-                this.execute("DELETE { GRAPH <"+graphUri+"> { ?s ?p ?o } } WHERE { GRAPH <"+graphUri+"> { ?s ?p ?o } }", callback);
-            } else {
-                callback(false, "wrong graph URI");
-            }
-        } else {
-            callback(false, "wrong graph URI");
-        }
-    }
-};
 
 QueryEngine.QueryEngine.prototype.checkGroupSemantics = function(groupVars, projectionVars) {
     if(groupVars === 'singleGroup') {
