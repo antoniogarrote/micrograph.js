@@ -1,6 +1,7 @@
 // imports
 var MicrographQL = require('./micrograph_ql.js').MicrographQL;
 var Utils = require("./../../js-trees/src/utils").Utils;
+
 /*
 var sys = null;
 try {
@@ -63,6 +64,18 @@ MicrographQuery.prototype.all = function(callback) {
     return this.store;
 };
 
+MicrographQuery.prototype.first = function(callback) {
+    this.all(function(res){
+	if(res.length > 0) {
+	    callback(res[0]);
+	} else {
+	    callback(null);
+	}
+    });
+
+    return this.store;
+}
+
 MicrographQuery.prototype.remove = function(callback) {
     this.kind = 'remove';
     this._executeUpdate(callback);
@@ -94,6 +107,7 @@ MicrographQuery.prototype._executeUpdate = function(callback) {
 
 MicrographQuery.prototype._executeQuery = function(callback) {
     var pattern = this._parseQuery(this.template);
+
     this.query = pattern.query;
     this.varsMap = pattern.varsMap;
     this.topLevel = pattern.topLevel;
@@ -106,8 +120,8 @@ MicrographQuery.prototype._executeQuery = function(callback) {
     // sort by
     var  sortAcum = [];
     if(this.sortValue) {
-	var nextVariable = MicrographQL.nextVariable();
 	var sortCounter = 0;
+	var nextVariable = MicrographQL.nextVariable();
 	for(var i=0; i<this.sortValue.length; i++) {
 	    var sortPredicate;
 	    var direction = 1;
@@ -491,24 +505,9 @@ MicrographQuery.prototype._parseModifyNodes = function(object, callback) {
 	    that.template = {'$id': result[i].$id};
 	    that.kind = 'removeNode';
 	    that._executeUpdate(function(result){
-
-		var subject = {'token':'uri', 'value':MicrographQL.base_uri+that.template['$id']};
-
 		if(result===true)
 		    counter++;
-
-		var pattern = that._modifyQuery([{'subject': subject,
-						  'predicate': {'token':'var', 'value':nextVariable+'pout'},
-						  'object': {'token':'var', 'value':nextVariable+'oout'}}]);
-
-		that.store.execute(pattern.query, function(success,res) {});
-
-		pattern = that._modifyQuery([{'subject': {'token':'var', 'value':nextVariable+'sin'},
-					      'predicate': {'token':'var', 'value':nextVariable+'pin'},
-					      'object': subject}]);
-
-		that.store.execute(pattern.query, function(success,res) {});
-
+		that._unlinkNode(that.template['$id'])
 	    });
 	};
     });
@@ -516,6 +515,28 @@ MicrographQuery.prototype._parseModifyNodes = function(object, callback) {
     if(callback)
 	callback(counter);
 };
+
+MicrographQuery.prototype._unlinkNode = function(id,cb){
+    if(cb == null)
+	cb = function(){};
+
+    var subject = {'token':'uri', 'value':MicrographQL.base_uri+id};
+    var nextVariable = MicrographQL.nextVariable();
+
+    var that = this;
+
+    var pattern = that._modifyQuery([{'subject': subject,
+				      'predicate': {'token':'var', 'value':nextVariable+'pout'},
+				      'object': {'token':'var', 'value':nextVariable+'oout'}}]);
+
+    that.store.execute(pattern.query, function(success,res) {
+	pattern = that._modifyQuery([{'subject': {'token':'var', 'value':nextVariable+'sin'},
+				      'predicate': {'token':'var', 'value':nextVariable+'pin'},
+				      'object': subject}]);
+	
+	that.store.execute(pattern.query, cb);
+    });
+}
 
 MicrographQuery.prototype._modifyQuery = function(quads) {
 

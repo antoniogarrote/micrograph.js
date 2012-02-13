@@ -135,7 +135,8 @@ Micrograph.prototype.load = function() {
 	    });
 	}
 	//}, function() {
-	callback(data);
+	if(callback)
+	    callback(data);
 	//});
     } else {
 
@@ -163,3 +164,20 @@ Micrograph.prototype.save = function(json,cb) {
     });
     return this;
 };
+
+Micrograph.prototype.update = function(json, cb) {
+    var id = json['$id'];
+    if(id == null) {
+	cb(false,"ID must be provided");
+    } else {
+	
+	var that = this;
+	this.where({'$id': id})._unlinkNode(id,function(success, _){
+	    if(success) {
+		that.save(json,cb);
+	    } else {
+		cb(false);
+	    }
+	})
+    }
+}

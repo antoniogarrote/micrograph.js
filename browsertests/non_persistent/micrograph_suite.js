@@ -808,3 +808,27 @@ this.micrograph_suite.remove5 = function(test) {
 	    });
     });
 };
+
+this.micrograph_suite.update1 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	         name: 'Bertrand',
+	         surname: 'Russell'},
+		{$type: 'Person',
+	         name: 'Niels',
+		 surname: 'Bohr'}]).
+	    where({name: 'Bertrand'}).
+	    first(function(russell) {
+		russell.profession = 'logician';
+		g.update(russell, function(res) {
+		    test.ok(res);
+		});
+	    }).
+	    where({profession: 'logician'}).
+	    all(function(logicians){
+		test.ok(logicians.length === 1);
+		test.ok(logicians[0].surname === 'Russell');
+		test.done();
+	    });
+    });
+}
