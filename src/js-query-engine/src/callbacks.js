@@ -301,7 +301,7 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
     var queryEnv = {blanks:{}, outCache:{}};
     this.engine.registerNsInEnvironment(null, queryEnv);
     var bindings = [];
-    this.engine.execute(query,  function(success, graph){
+    this.engine.execute(query, function(success, graph){
         if(success) {
             var node = graph;
             var mustFlush = false;
@@ -359,9 +359,11 @@ Callbacks.CallbacksBackend.prototype.stopObservingNode = function(callback) {
 
 // Queries
 
-Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, endCallback) {
-    var queryParsed = this.aqt.parseQueryString(query);
-    var parsedTree = this.aqt.parseSelect(queryParsed.units[0]);
+Callbacks.CallbacksBackend.prototype.observeQuery = function(queryIdentifier, queryParsed, callback, endCallback) {
+    // JSON/parse/stringify to clone
+    // In the original code, this was a string so it was not modified
+    var parsedTree = this.aqt.parseSelect(JSON.parse(JSON.stringify(queryParsed.units[0])));
+
     var patterns = this.aqt.collectBasicTriples(parsedTree);
     var that = this;
     var queryEnv = {blanks:{}, outCache:{}};
@@ -370,8 +372,8 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
 
     var counter = this.queryCounter;
     this.queryCounter++;
-    this.queriesMap[counter] = query;
-    this.queriesInverseMap[query] = counter;
+    this.queriesMap[counter] = queryParsed;
+    this.queriesInverseMap[queryIdentifier] = counter;
     this.queriesList.push(counter);
     this.queriesCallbacksMap[counter] = callback;
 
@@ -409,7 +411,7 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
 
     }
 
-    this.engine.execute(query, function(success, results){
+    this.engine.execute(queryParsed, function(success, results){
         if(success){
             callback(results);
         } else {
@@ -421,10 +423,57 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
         endCallback();
 };
 
-Callbacks.CallbacksBackend.prototype.stopObservingQuery = function(query) {
-    var id = this.queriesInverseMap[query];
+Callbacks.CallbacksBackend.prototype.addQueryToObserver = function(queryIdentifier, queryParsed) {
+    var parsedTree = this.aqt.parseSelect(JSON.parse(JSON.stringify(queryParsed.units[0])));
+
+    var patterns = this.aqt.collectBasicTriples(parsedTree);
+    var that = this;
+    var queryEnv = {blanks:{}, outCache:{}};
+    this.engine.registerNsInEnvironment(null, queryEnv);
+    var floop, pattern, quad, indexKey, indexOrder, index;
+
+    var counter = this.queriesInverseMap[queryIdentifier];
+
+    for(var i=0; i<patterns.length; i++) {
+        quad = patterns[i];
+        if(quad.graph == null) {
+            quad.graph = that.engine.lexicon.defaultGraphUriTerm;
+        }
+
+        var normalized = that.engine.normalizeQuad(quad, queryEnv, true);
+        pattern =  new QuadIndexCommon.Pattern(normalized);        
+        indexKey = that._indexForPattern(pattern);
+        indexOrder = that.componentOrders[indexKey];
+        index = that.queriesIndexMap[indexKey];
+
+        for(var j=0; j<indexOrder.length; j++) {
+            var component = indexOrder[j];
+            var quadValue = normalized[component];
+            if(typeof(quadValue) === 'string') {
+                if(index['_'] == null) {
+                    index['_'] = [];
+                }
+                index['_'].push(counter);
+                break;
+            } else {
+                if(j===indexOrder.length-1) {
+                    index[quadValue] = index[quadValue] || {'_':[]};
+                    index[quadValue]['_'].push(counter);
+                } else {
+                    index[quadValue] = index[quadValue] || {};
+                    index = index[quadValue];
+                }
+            }
+        }
+
+    }
+
+};
+
+Callbacks.CallbacksBackend.prototype.stopObservingQuery = function(queryIdentifier) {
+    var id = this.queriesInverseMap[queryIdentifier];
     if(id != null) {
-        delete this.queriesInverseMap[query];
+        delete this.queriesInverseMap[queryIdentifier];
         delete this.queriesMap[id];
         this.queriesList = Utils.remove(this.queriesList, id);
     }

@@ -832,3 +832,110 @@ this.micrograph_suite.update1 = function(test) {
 	    });
     });
 }
+
+
+this.micrograph_suite.bind1 = function(test) {
+    try{
+	var counter = 0;
+	mg.create(function(g) {
+	    g.where({$type:'Person'}).
+		bind(function(results) {
+		    counter++;
+		}).
+		load([{$type: 'Person',
+	               name: 'Bertrand',
+	               surname: 'Russell'}]).
+		load([{$type: 'Person',
+	               name: 'Niels',
+		       surname: 'Bohr'}]);
+	});
+    
+	test.ok(counter==3);
+	test.done();
+    }catch(e) {
+	console.log(e);
+	console.log(e.stack);
+	test.ok(false);
+	test.done();
+    }
+};
+
+
+this.micrograph_suite.bind2a = function(test) {
+    try{
+	var counter = 0;
+	mg.create(function(g) {
+	    g.where({$type:'Person'}).
+		bind(function(results) {
+		    counter++;
+		}).
+		load([{$type: 'Person',
+	               name: 'Bertrand',
+	               surname: 'Russell'}]).
+		load([{$type: 'Person',
+	               name: 'Niels',
+		       surname: 'Bohr'}]);
+
+	    test.ok(counter===3);
+
+	    g.where({name: 'Niels'}).
+		first(function(nb){
+		    nb['profession'] = 'phisicist';
+		    g.save(nb);
+		}).
+		save({name: 'Wolfgang',
+		      surname: 'Pauli',
+ 		      profession: 'phisicist',
+		      $type: 'Person'});
+
+	    test.ok(counter===5);
+	    test.done();
+	});
+    
+    }catch(e) {
+	console.log(e);
+	console.log(e.stack);
+	test.ok(false);
+	test.done();
+    }
+};
+
+this.micrograph_suite.bind2b = function(test) {
+    try{
+	var counter = 0;
+	mg.create(function(g) {
+	    g.where({$type:'Person'}).
+		bind(function(results) {
+		    counter++;
+		}).
+		load([{$type: 'Person',
+	               name: 'Bertrand',
+	               surname: 'Russell'}]).
+		load([{$type: 'Person',
+	               name: 'Niels',
+		       surname: 'Bohr'}]);
+
+	    test.ok(counter===3);
+
+	    g.where({name: 'Niels'}).
+		first(function(nb){
+		    nb['profession'] = 'phisicist';
+		    g.update(nb);
+		}).
+		save({name: 'Wolfgang',
+		      surname: 'Pauli',
+ 		      profession: 'phisicist',
+		      $type: 'Person'});
+
+	    test.ok(counter===5);
+	    test.done();
+	});
+    
+    }catch(e) {
+	console.log(e);
+	console.log(e.stack);
+	test.ok(false);
+	test.done();
+    }
+};
+

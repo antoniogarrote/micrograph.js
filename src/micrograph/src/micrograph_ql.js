@@ -390,12 +390,12 @@ MicrographQL.singleNodeQuery = function(id, predVar, objVar) {
 		 token: 'executableunit' }],
 	     prologue: { token: 'prologue', prefixes: [], base: '' },
 	     kind: 'query',
-	     token: 'query' }
+	     token: 'query' };
 };
 
 MicrographQL.literalToJS = function(object) {
     if(object.type === "http://www.w3.org/2001/XMLSchema#float") {
-	object = parseFloat(object.value)
+	object = parseFloat(object.value);
     } else if(object.type === "http://www.w3.org/2001/XMLSchema#boolean") {
 	object = (object.value === "true") ? true : false;
     } else if(object.type === "http://www.w3.org/2001/XMLSchema#dateTime") {

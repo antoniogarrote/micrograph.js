@@ -6,6 +6,14 @@ var Utils = require("./../../js-trees/src/utils").Utils;
 
 var MicrographQuery = require('./micrograph_query').MicrographQuery;
 var MicrographQL = require('./micrograph_ql').MicrographQL;
+/*
+var sys = null;
+try {
+    sys = require("util");
+} catch(e) {
+    sys = require("sys");
+}
+*/
 
 // Store
 var Micrograph = function(options, callback) {
@@ -14,11 +22,17 @@ var Micrograph = function(options, callback) {
     }
 
     var that = this;
+    this.callbackToInner = {};
+    this.callbackMap = {};
+    this.callbackCounter = 0;
+    this.callbackToNodes = {};
+    this.nodesToCallbacks = {};
 
     for(var i=0; i<Micrograph.vars.length; i++) {
 	this['_'+Micrograph.vars[i]] = this._(Micrograph.vars[i]);
     }
 
+    this.callbacksMap = {}; 
 
     new Lexicon.Lexicon(function(lexicon){
         if(options['overwrite'] === true) {
@@ -33,7 +47,7 @@ var Micrograph = function(options, callback) {
             options.backend = backend;
             options.lexicon =lexicon;
             that.engine = new QueryEngine.QueryEngine(options);      
-
+	    that.engine.eventsOnBatchLoad = true;
 	    that.engine.abstractQueryTree.oldParseQueryString = that.engine.abstractQueryTree.parseQueryString;
 	    that.engine.abstractQueryTree.parseQueryString = function(toParse) {
 
@@ -52,7 +66,7 @@ var Micrograph = function(options, callback) {
 };
 exports.Micrograph = Micrograph;
 
-Micrograph.VERSION = "0.1.0";
+Micrograph.VERSION = "0.2.0";
 
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
@@ -77,8 +91,13 @@ Micrograph.prototype.execute = function(query, callback) {
     this.engine.execute(query,callback);
 };
 
+Micrograph.prototype.startGraphModification = function() {
+    this.engine.startGraphModification();
+};
 
-
+Micrograph.prototype.endGraphModification = function() {
+    this.engine.endGraphModification();
+};
 
 Micrograph.prototype.where = function(query) {
     var queryObj =  new MicrographQuery(query);
@@ -122,22 +141,18 @@ Micrograph.prototype.load = function() {
 	var quads;
 	var that = this;
 
-	//Utils.repeat(0,data.length, function(k,env) {
-	// 	var floop = arguments.callee;
 	for(var i=0; i<data.length; i++) {
 	    quads = MicrographQL.parseJSON(data[i],graph);
 
 	    //console.log("LOAD");
 	    //console.log(quads);
-
+	    that.engine.startGraphModification();
 	    that.engine.batchLoad(quads,function(){ 
-		//k(floop,env); 
+		that.engine.endGraphModification();
 	    });
 	}
-	//}, function() {
 	if(callback)
 	    callback(data);
-	//});
     } else {
 
         var parser = this.engine.rdfLoader.parsers[mediaType];
@@ -170,8 +185,9 @@ Micrograph.prototype.update = function(json, cb) {
     if(id == null) {
 	cb(false,"ID must be provided");
     } else {
-	
+
 	var that = this;
+	that.engine.startGraphModification();	
 	this.where({'$id': id})._unlinkNode(id,function(success, _){
 	    if(success) {
 		that.save(json,cb);
@@ -179,5 +195,31 @@ Micrograph.prototype.update = function(json, cb) {
 		cb(false);
 	    }
 	})
+	that.engine.endGraphModification();
     }
+}
+
+Micrograph.prototype.bind = function(query, callback) {
+    // execution
+    var queryIdentifier = 'cb'+this.callbackCounter;
+    this.callbackCounter++;
+
+    var that = this;
+    var nodesMap = {};
+
+    var innerCallback = function(results) {
+	results = MicrographQuery._processQueryResults(results, query.topLevel, query.varsMap, query.inverseMap, that);
+	for(var i=0; i<results.length; i++) {
+	    var id = results[i]['$id'];
+	    if(nodesMap[id] == null) {
+		that.engine.callbacksBackend.addQueryToObserver(queryIdentifier, MicrographQL.singleNodeQuery(MicrographQL.base_uri+id,'p','o'));
+		nodesMap[id] = true;
+	    }
+	}
+	callback(results);
+    };
+    this.callbackToInner[callback] = innerCallback;
+    this.callbackMap[queryIdentifier] = innerCallback;
+
+    this.engine.callbacksBackend.observeQuery(queryIdentifier, query.query,innerCallback,function() {});
 }

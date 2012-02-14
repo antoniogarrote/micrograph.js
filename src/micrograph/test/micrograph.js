@@ -48,7 +48,7 @@ exports.parseTriples1 = function(test) {
     });
 };
 
-
+/*
 exports.bgpExecution1 = function(test) {
     mg.create(function(g) {
 	g.execute("INSERT DATA { <http://rdfstore-js.org/micrographql/graph#obj1> <name> \"John\"; <name> \"Juan\"; <age> \"26\"^^<http://www.w3.org/2001/XMLSchema#float> ; <friend> <http://rdfstore-js.org/micrographql/graph#obj2> .\
@@ -73,7 +73,7 @@ exports.bgpExecution1 = function(test) {
 		  });
     });
 };
-
+*/
 exports.filters1 = function(test) {
     var data = {
 	$type: 'Person',
@@ -830,7 +830,113 @@ exports.update1 = function(test) {
 		test.done();
 	    });
     });
-}
+};
+
+exports.bind1 = function(test) {
+    try{
+	var counter = 0;
+	mg.create(function(g) {
+	    g.where({$type:'Person'}).
+		bind(function(results) {
+		    counter++;
+		}).
+		load([{$type: 'Person',
+	               name: 'Bertrand',
+	               surname: 'Russell'}]).
+		load([{$type: 'Person',
+	               name: 'Niels',
+		       surname: 'Bohr'}]);
+	});
+    
+	test.ok(counter==3);
+	test.done();
+    }catch(e) {
+	console.log(e);
+	console.log(e.stack);
+	test.ok(false);
+	test.done();
+    }
+};
+
+
+exports.bind2a = function(test) {
+    try{
+	var counter = 0;
+	mg.create(function(g) {
+	    g.where({$type:'Person'}).
+		bind(function(results) {
+		    counter++;
+		}).
+		load([{$type: 'Person',
+	               name: 'Bertrand',
+	               surname: 'Russell'}]).
+		load([{$type: 'Person',
+	               name: 'Niels',
+		       surname: 'Bohr'}]);
+
+	    test.ok(counter===3);
+
+	    g.where({name: 'Niels'}).
+		first(function(nb){
+		    nb['profession'] = 'phisicist';
+		    g.save(nb);
+		}).
+		save({name: 'Wolfgang',
+		      surname: 'Pauli',
+ 		      profession: 'phisicist',
+		      $type: 'Person'})
+
+	    test.ok(counter===5);
+	    test.done();
+	});
+    
+    }catch(e) {
+	console.log(e);
+	console.log(e.stack);
+	test.ok(false);
+	test.done();
+    }
+};
+
+exports.bind2b = function(test) {
+    try{
+	var counter = 0;
+	mg.create(function(g) {
+	    g.where({$type:'Person'}).
+		bind(function(results) {
+		    counter++;
+		}).
+		load([{$type: 'Person',
+	               name: 'Bertrand',
+	               surname: 'Russell'}]).
+		load([{$type: 'Person',
+	               name: 'Niels',
+		       surname: 'Bohr'}]);
+
+	    test.ok(counter===3);
+
+	    g.where({name: 'Niels'}).
+		first(function(nb){
+		    nb['profession'] = 'phisicist';
+		    g.update(nb);
+		}).
+		save({name: 'Wolfgang',
+		      surname: 'Pauli',
+ 		      profession: 'phisicist',
+		      $type: 'Person'})
+
+	    test.ok(counter===5);
+	    test.done();
+	});
+    
+    }catch(e) {
+	console.log(e);
+	console.log(e.stack);
+	test.ok(false);
+	test.done();
+    }
+};
+
 
 /*
 exports.performance = function(test) {

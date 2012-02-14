@@ -548,25 +548,32 @@ QueryEngine.QueryEngine.prototype.denormalizeBindings = function(bindings, env, 
 
 // Queries execution
 
+QueryEngine.QueryEngine.prototype.startGraphModification = function() {
+    this.callbacksBackend.startGraphModification();
+};
+
+QueryEngine.QueryEngine.prototype.endGraphModification = function() {
+    this.callbacksBackend.endGraphModification(function(){});
+};
+
 QueryEngine.QueryEngine.prototype.execute = function(queryString, callback, defaultDataset, namedDataset){
     //try{
-        queryString = Utils.normalizeUnicodeLiterals(queryString);
-
-        var syntaxTree = this.abstractQueryTree.parseQueryString(queryString);
+        var syntaxTree = queryString;
+        if(typeof(queryString) === 'string') {
+            queryString = Utils.normalizeUnicodeLiterals(queryString);
+            var syntaxTree = this.abstractQueryTree.parseQueryString(queryString);
+        }
         if(syntaxTree == null) {
             callback(false,"Error parsing query string");
         } else {
             if(syntaxTree.token === 'query' && syntaxTree.kind == 'update')  {
-                this.callbacksBackend.startGraphModification();
                 var that = this;
                 this.executeUpdate(syntaxTree, function(success, result){
 		    if(that.lexicon.updateAfterWrite)
 			that.lexicon.updateAfterWrite();
 
                     if(success) {
-                        that.callbacksBackend.endGraphModification(function(){
-                            callback(success, result);
-                        });
+                        callback(success, result);                   
                     } else {
                         that.callbacksBackend.cancelGraphModification();
                         callback(success, result);
@@ -597,8 +604,10 @@ QueryEngine.QueryEngine.prototype.executeQuery = function(syntaxTree, callback, 
     this.registerNsInEnvironment(prologue, queryEnv);
 
     // retrieval queries can only have 1 executable unit
-    var aqt = that.abstractQueryTree.parseExecutableUnit(units[0]);
-
+    var aqt = units[0];
+    if(units[0].pattern.kind !== 'BGP') { // it hasn't been parsed
+	aqt = that.abstractQueryTree.parseExecutableUnit(units[0]);
+    }
 
     // can be anything else but a select???
     if(aqt.kind === 'select') {
@@ -1234,9 +1243,6 @@ QueryEngine.QueryEngine.prototype.batchLoad = function(quads, callback) {
     var blanks = {};
     var maybeBlankOid, oid, quad, key, originalQuad;
 
-    if(this.eventsOnBatchLoad)
-        this.callbacksBackend.startGraphModification();
-
     for(var i=0; i<quads.length; i++) {
         quad = quads[i];
 	
@@ -1402,13 +1408,7 @@ QueryEngine.QueryEngine.prototype.batchLoad = function(quads, callback) {
         }
     };
 
-    if(this.eventsOnBatchLoad) {
-        this.callbacksBackend.endGraphModification(function(){
-            exitFn();
-        });
-    } else {
-        exitFn();
-    }
+    exitFn();
         
     if(success) {
         return counter;
