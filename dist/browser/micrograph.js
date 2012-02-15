@@ -10396,9 +10396,17 @@ var Micrograph = function(options, callback) {
 		}
 	    };
 
-            if(callback) {
-                callback(that);
-            }
+	    if(isPersistent) {
+		// not sure about this,
+		// moving all persistent data to the cache
+		that.where({}).all(function(){
+		    if(callback)
+			callback(that);
+		});
+	    } else {
+		if(callback)
+                    callback(that);
+	    }
         });
     },options['name']);
 };
