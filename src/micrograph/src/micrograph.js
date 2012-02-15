@@ -2,7 +2,10 @@
 var QueryEngine = require("./../../js-query-engine/src/query_engine").QueryEngine;
 var QuadBackend = require("./../../js-rdf-persistence/src/quad_backend").QuadBackend;
 var Lexicon = require("./../../js-rdf-persistence/src/lexicon").Lexicon;
+var WebLocalStorageLexicon = require("./../../js-rdf-persistence/src/web_local_storage_lexicon").WebLocalStorageLexicon;
 var Utils = require("./../../js-trees/src/utils").Utils;
+var InMemoryBTree = require("./../../js-trees/src/in_memory_b_tree").InMemoryBTree;
+var WebLocalStorageBTree = require("./../../js-trees/src/web_local_storage_b_tree").WebLocalStorageBTree;
 
 var MicrographQuery = require('./micrograph_query').MicrographQuery;
 var MicrographQL = require('./micrograph_ql').MicrographQL;
@@ -34,12 +37,22 @@ var Micrograph = function(options, callback) {
 
     this.callbacksMap = {}; 
 
-    new Lexicon.Lexicon(function(lexicon){
+    var isPersistent = options['persistent'];
+    var LexiconModule = Lexicon;
+    if(isPersistent) 
+	LexiconModule = WebLocalStorageLexicon;
+
+    new LexiconModule.Lexicon(function(lexicon){
         if(options['overwrite'] === true) {
             // delete lexicon values
             lexicon.clear();
         }
-        new QuadBackend.QuadBackend(options, function(backend){
+
+	var baseTree = InMemoryBTree;
+	if(isPersistent)
+	    baseTree = WebLocalStorageBTree;
+	    
+        new QuadBackend.QuadBackend(options, baseTree, function(backend){
             if(options['overwrite'] === true) {
                 // delete index values
                 backend.clear();
@@ -86,6 +99,21 @@ Micrograph.create = function() {
     new Micrograph(options, callback);
 };
 
+Micrograph.open = function(name,overwrite,options,callback) {
+    if(callback == null) {
+	if(typeof(options) === 'function') {
+	    callback = options;
+	    options = {};
+	}  else {
+	    throw "Persistent storage requires a callback functon"
+	}
+    }
+    options['persistent'] = true;
+    options['name'] = name;
+    options['overwrite'] = overwrite;
+    
+    new Micrograph(options, callback);
+};
 
 Micrograph.prototype.execute = function(query, callback) {
     this.engine.execute(query,callback);

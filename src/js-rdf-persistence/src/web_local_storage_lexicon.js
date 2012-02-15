@@ -117,7 +117,7 @@ WebLocalStorageLexicon.Lexicon.prototype.registerGraph = function(oid){
         this.knownGraphs[oid] = true;
         this.storage.setItem(this.pointer("knownGraphs"),JSON.stringify(this.knownGraphs));
     }
-    return true
+    return true;
 };
 
 WebLocalStorageLexicon.Lexicon.prototype.registeredGraphs = function(shouldReturnUris) {

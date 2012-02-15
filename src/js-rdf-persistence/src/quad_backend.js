@@ -19,7 +19,7 @@ var QuadIndex = require("./quad_index").QuadIndex;
  * GSP  (s, ?, ?, g), (s, p, ?, g)
  * OS   (s, ?, o, ?)
  */
-QuadBackend.QuadBackend = function (configuration, callback) {
+QuadBackend.QuadBackend = function (configuration, BaseTree, callback) {
     if (arguments != 0) {
         this.indexMap = {};
         this.treeOrder = configuration['treeOrder'];
@@ -32,6 +32,9 @@ QuadBackend.QuadBackend = function (configuration, callback) {
             GSP:['graph', 'subject', 'predicate', 'object'],
             OS:['object', 'subject', 'predicate', 'graph']
         };
+
+	// composing
+	QuadIndex.compose(BaseTree);
 
         for (var i = 0; i < this.indices.length; i++) {
             var indexKey = this.indices[i];
