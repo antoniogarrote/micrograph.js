@@ -48,6 +48,7 @@ exports.parseTriples1 = function(test) {
     });
 };
 
+
 /*
 exports.bgpExecution1 = function(test) {
     mg.create(function(g) {
@@ -65,7 +66,6 @@ exports.bgpExecution1 = function(test) {
 			      test.ok(result.age === 26);
 			  }).
 			  all(function(results) {
-			      console.log(results);
 			      test.ok(results.length === 1);
 			      test.ok(counter === 1);
 			      test.done();
@@ -74,6 +74,7 @@ exports.bgpExecution1 = function(test) {
     });
 };
 */
+
 exports.filters1 = function(test) {
     var data = {
 	$type: 'Person',
@@ -937,6 +938,64 @@ exports.bind2b = function(test) {
     }
 };
 
+exports.instantiate1 = function(test) {
+    mg.create(function(g) {
+	g.define('Person',{
+		nationality: function() {
+		    if(this.country) {
+			return country;
+		    } else {
+			return 'apatride';
+		    }
+		},
+		init: function(){
+		    this.__lastType = this.__lastType+'Person';
+		    this._isPerson = true;
+		}
+	    }).
+	    define('Philosopher',{
+		init: function(){
+		    this.__lastType = this.__lastType+'Philosopher';
+		    this._isPhilosopher = true;
+		},
+		likesPhilosophy: true
+	    }).
+	    define('not(Philosopher)',{
+		likesPhilosophy: false
+	    }).
+	    define('Logician',{
+		init: function(){
+		    this.__lastType = this.__lastType+'Logician';
+		    this._isLogician = true;
+		}
+	    }).
+	    load([{$type: ['Person','Philosopher'],
+	           name: 'Bertrand',
+	           surname: 'Russell'},
+		  {$type: ['Person','Phisicist'],
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$type: 'Person'}).
+	    all().instances(function(people){
+		test.ok(people.length === 2);
+		for(var i=0; i<people.length; i++) {
+		    test.ok(people[i].nationality() === 'apatride');
+		}
+	    }).
+	    where({$type: 'Philosopher'}).
+	    all().instances(function(philosophers){
+		test.ok(philosophers[0].__lastType === 'undefinedPersonPhilosopher');
+		test.ok(philosophers.length === 1);
+		test.ok(philosophers[0].likesPhilosophy);
+	    }).
+	    where({$type: 'Phisicist'}).
+	    all().instances(function(phisicists){
+		test.ok(phisicists.length === 1);
+		test.ok(!phisicists[0].likesPhilosophy);
+		test.done();
+	    });
+    });
+};
 
 /*
 exports.performance = function(test) {

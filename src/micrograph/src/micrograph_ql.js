@@ -202,7 +202,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
     var filterCounter = 0;
     if(expression['$id'] != null || !context.isQuery) {
 	if(expression['$id'] == null) {
-	    subject = MicrographQL.parseURI(null) // generates URI with next ID
+	    subject = MicrographQL.parseURI(null); // generates URI with next ID
 	    if(expression['$id'] == null) 
 		expression['$id'] = "object"+(MicrographQL.counter-1); // the previous ID
 
@@ -316,14 +316,21 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 		    } else {
 			if(expression[p].constructor == Array) {
 			    for(var i=0; i<expression[p].length; i++) {
-				// @todo check if this is a literal instead of an object
-				result = MicrographQL.parseBGP(expression[p][i], context, false, graph);
-				object = result[0];
-				context.quads = context.quads.concat(result[1]);
-				var quad = {'subject':subject, 'predicate':predicate, 'object':object};
-				if(graph != null)
-				    quad['graph'] = graph;
-				quads.push(quad);
+				if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
+				    result = MicrographQL.parseBGP(expression[p][i], context, false, graph);
+				    object = result[0];
+				    context.quads = context.quads.concat(result[1]);
+				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
+				    if(graph != null)
+					quad['graph'] = graph;
+				    quads.push(quad);
+				} else {
+				    object = MicrographQL.parseLiteral(expression[p][i]);
+				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
+				    if(graph != null)
+					quad['graph'] = graph;
+				    quads.push(quad);
+				}
 			    }
 			} else {
 			    if(expression[p]['token'] === 'var') {

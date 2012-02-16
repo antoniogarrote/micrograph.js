@@ -48,6 +48,56 @@ this.micrograph_suite.parseTriples1 = function(test) {
     });
 };
 
+this.micrograph_suite.testJSONP = function(test) {
+    mg.create(function(g) {
+	g.from("https://api.github.com/repos/clojure/clojure/commits?callback=loadCommits").
+	    onError(function(e){
+		test.ok(false);
+		test.done();
+	    }).
+	    transform(function(prop,obj) {
+		if(prop == null) {
+		    delete obj.meta;
+		} else if(prop === 'data') {
+		    obj.$id = obj.url;
+		    obj.$type = 'Commit';
+		    obj.message = obj.commit.message;
+		    obj.tree = obj.commit.tree;
+		    if(obj.author && obj.commit.author) {
+          		obj.author.email = obj.commit.author.email;
+			obj.author.name = obj.commit.author.name;
+		    }
+		    obj.date = new Date(obj.commit.author.date);
+		    delete obj.commit;
+		} else if(prop === 'committer' || prop === 'author') {
+		    obj.$id = obj.url;
+		    obj.$type = 'Person';
+		} else if(prop === 'parents' || prop === 'tree') {
+		    obj.$id = obj.url;
+		    delete obj.url;
+		    delete obj.sha;
+		}
+	    }).
+	    load(function() {
+		g.where({$type: 'Commit', 
+			 parents:{
+			     parents:{ committer: {} }, 
+			     committer:{}
+			 }}).
+		    each(function(commit){
+			test.ok(commit.parents != null);
+			test.ok(commit.parents.committer.login != null);
+			test.ok(commit.parents.parents != null);
+			test.ok(commit.parents.parents.committer.login != null);
+		    }).
+		    all(function(commits) {
+			test.done();
+		    });
+	    });
+    });
+};
+
+
 /*
 this.micrograph_suite.bgpExecution1 = function(test) {
     mg.create(function(g) {
@@ -939,3 +989,61 @@ this.micrograph_suite.bind2b = function(test) {
     }
 };
 
+this.micrograph_suite.instantiate1 = function(test) {
+    mg.create(function(g) {
+	g.define('Person',{
+		nationality: function() {
+		    if(this.country) {
+			return country;
+		    } else {
+			return 'apatride';
+		    }
+		},
+		init: function(){
+		    this.__lastType = this.__lastType+'Person';
+		    this._isPerson = true;
+		}
+	    }).
+	    define('Philosopher',{
+		init: function(){
+		    this.__lastType = this.__lastType+'Philosopher';
+		    this._isPhilosopher = true;
+		},
+		likesPhilosophy: true
+	    }).
+	    define('not(Philosopher)',{
+		likesPhilosophy: false
+	    }).
+	    define('Logician',{
+		init: function(){
+		    this.__lastType = this.__lastType+'Logician';
+		    this._isLogician = true;
+		}
+	    }).
+	    load([{$type: ['Person','Philosopher'],
+	           name: 'Bertrand',
+	           surname: 'Russell'},
+		  {$type: ['Person','Phisicist'],
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$type: 'Person'}).
+	    all().instances(function(people){
+		test.ok(people.length === 2);
+		for(var i=0; i<people.length; i++) {
+		    test.ok(people[i].nationality() === 'apatride');
+		}
+	    }).
+	    where({$type: 'Philosopher'}).
+	    all().instances(function(philosophers){
+		test.ok(philosophers[0].__lastType === 'undefinedPersonPhilosopher');
+		test.ok(philosophers.length === 1);
+		test.ok(philosophers[0].likesPhilosophy);
+	    }).
+	    where({$type: 'Phisicist'}).
+	    all().instances(function(phisicists){
+		test.ok(phisicists.length === 1);
+		test.ok(!phisicists[0].likesPhilosophy);
+		test.done();
+	    });
+    });
+};

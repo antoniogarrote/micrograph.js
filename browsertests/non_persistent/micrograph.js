@@ -2907,7 +2907,7 @@ QuadBackend.QuadBackend.prototype.search = function (quad, callback) {
     if (callback)
         callback(result != null);
 
-    return (result != null)
+    return (result != null);
 };
 
 
@@ -3682,50 +3682,6 @@ Lexicon.Lexicon.prototype.unregisterTerm = function (kind, oid) {
 };
 
 // end of ./src/js-rdf-persistence/src/lexicon.js 
-// exports
-var NetworkTransport = {};
-
-NetworkTransport.load = function (uri, accept, callback, redirect) {
-    var transport = jQuery;
-
-    transport.ajax({
-        url:uri,
-        headers:{"Accept":accept},
-
-        success:function (data, status, xhr) {
-            if (("" + xhr.status)[0] == '2') {
-                var headers = xhr.getAllResponseHeaders().split("\n");
-                var acum = {};
-                for (var i = 0; i < headers.length; i++) {
-                    var header = headers[i].split(":");
-                    acum[header[0]] = header[1];
-                }
-
-                callback(true, {headers:acum,
-                    data:data});
-            }
-        },
-
-        error:function (xhr, textStatus, ex) {
-            if (("" + xhr.status)[0] == '3') {
-                if (redirection == 0) {
-                    callback(false, 500);
-                } else {
-                    var location = (xhr.getAllResponseHeaders()["Location"] || xhr.getAllResponseHeaders()["location"]);
-                    if (location != null) {
-                        NetworkTransport.load(location, accept, callback, (redirection - 1));
-                    } else {
-                        callback(false, 500);
-                    }
-                }
-            } else {
-                callback(false, xhr.statusCode());
-            }
-        }
-    });
-};
-
-// end of ./src/js-communication/src/ajax_transport.js 
 // exports
 var AbstractQueryTree = {};
 
@@ -7324,23 +7280,6 @@ QueryEngine.QueryEngine.prototype.executeQuery = function(syntaxTree, callback, 
               callback(false, result);
           }
       });
-    } else if(aqt.kind === 'ask') {
-        aqt.projection = [{"token": "variable", "kind": "*"}];
-        this.executeSelect(aqt, queryEnv, defaultDataset, namedDataset, function(success, result){
-            if(success) {
-                if(success) {              
-                    if(result.length>0) {
-                        callback(true, true);
-                    } else {
-                        callback(true, false);
-                    }
-                } else {
-                    callback(false, result);
-                }
-            } else {
-                callback(false, result);
-            }
-        });
     }
 };
 
@@ -7348,7 +7287,7 @@ QueryEngine.QueryEngine.prototype.executeQuery = function(syntaxTree, callback, 
 // Select queries
 
 QueryEngine.QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedDataset, callback) {
-    if(unit.kind === "select" || unit.kind === "ask" || unit.kind === "construct" || unit.kind === "modify") {
+    if(unit.kind === "select" || unit.kind === "modify") {
         var projection = unit.projection;
         var dataset    = unit.dataset;
         var modifier   = unit.modifier;
@@ -7544,8 +7483,6 @@ QueryEngine.QueryEngine.prototype.groupSolution = function(bindings, group, data
 QueryEngine.QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern, env) {
     if(pattern.kind === "BGP") {
         return this.executeAndBGP(projection, dataset, pattern, env);
-    } else if(pattern.kind === "UNION") {
-        return this.executeUNION(projection, dataset, pattern.value, env);            
     } else if(pattern.kind === "JOIN") {
         return this.executeJOIN(projection, dataset, pattern, env);            
     } else if(pattern.kind === "LEFT_JOIN") {
@@ -7692,34 +7629,6 @@ QueryEngine.QueryEngine.prototype.executeZeroOrMorePath = function(pattern, data
     } else {
 	throw "Kind of path not supported!";
     }
-};
-
-QueryEngine.QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env) {
-    var setQuery1 = patterns[0];
-    var setQuery2 = patterns[1];
-    var set1 = null;
-    var set2 = null;
-
-    if(patterns.length != 2) {
-        throw("SPARQL algebra UNION with more than two components");
-    }
-
-    var that = this;
-    var sets = [];
-
-    set1 = that.executeSelectUnit(projection, dataset, setQuery1, env);
-    if(set1==null) {
-        return null;
-    }
-
-    set2 = that.executeSelectUnit(projection, dataset, setQuery2, env);
-    if(set2==null) {
-        return null;
-    }
-
-    var result = QueryPlan.unionBindings(set1, set2);
-    result = QueryFilters.checkFilters(patterns, result, false, dataset, env, that);
-    return result;
 };
 
 QueryEngine.QueryEngine.prototype.executeAndBGP = function(projection, dataset, patterns, env) {
@@ -8618,80 +8527,6 @@ Callbacks.CallbacksBackend.prototype._indexForPattern = function(pattern) {
     return 'SPOG'; // If no other match, we return the most generic index
 };
 
-Callbacks.CallbacksBackend.prototype.observeNode = function() {
-    var uri,graphUri,callback,doneCallback;
-
-    if(arguments.length === 4) {
-        uri = arguments[0];
-        graphUri = arguments[1];
-        callback = arguments[2];
-        doneCallback = arguments[3];
-    } else {
-        uri = arguments[0];
-        graphUri = this.engine.lexicon.defaultGraphUri;
-        callback = arguments[1];
-        doneCallback = arguments[2];
-    }
-    var query = "CONSTRUCT { <" + uri + "> ?p ?o } WHERE { GRAPH <" + graphUri + "> { <" + uri + "> ?p ?o } }";
-    var that = this;
-    var queryEnv = {blanks:{}, outCache:{}};
-    this.engine.registerNsInEnvironment(null, queryEnv);
-    var bindings = [];
-    this.engine.execute(query, function(success, graph){
-        if(success) {
-            var node = graph;
-            var mustFlush = false;
-            var observer = function(event, triples){
-                if(event === 'eventsFlushed' && mustFlush ) {
-                    mustFlush = false;
-                    try {
-                        callback(node);
-                    }catch(e){}
-                } else if(event !== 'eventsFlushed') {
-                    mustFlush = true;
-                    for(var i = 0; i<triples.length; i++) {
-                        var triple = triples[i];
-                        var s = RDFJSInterface.buildRDFResource(triple.subject,bindings,that.engine,queryEnv);
-                        var p = RDFJSInterface.buildRDFResource(triple.predicate,bindings,that.engine,queryEnv);
-                        var o = RDFJSInterface.buildRDFResource(triple.object,bindings,that.engine,queryEnv);
-                        if(s!=null && p!=null && o!=null) {
-                            triple = new RDFJSInterface.Triple(s,p,o);
-                            if(event === Callbacks['added']) {
-                                node.add(triple);
-                            } else if(event === Callbacks['deleted']) {
-                                node.remove(triple);
-                            }
-                        }
-                    }
-                }
-            };
-            that.observersMap[callback] = observer;
-            that.subscribeEmpty(Callbacks['eventsFlushed'], observer);
-            that.subscribe(uri,null,null,null,observer,function(){
-                try {
-                    callback(node);
-                }catch(e){}
-
-                if(doneCallback)
-                    doneCallback(true)
-            });
-        } else {
-            if(doneCallback)
-                doneCallback(false);
-        }
-    });
-};
-
-Callbacks.CallbacksBackend.prototype.stopObservingNode = function(callback) {
-    var observer = this.observersMap[callback];
-    if(observer) {
-        this.unsubscribe(observer);
-        this.unsubscribeEmpty(Callbacks['eventsFlushed'],observer);
-        return true;
-    } else {
-        return false;
-    }
-};
 
 // Queries
 
@@ -8880,468 +8715,6 @@ Callbacks.CallbacksBackend.prototype.dispatchQueries = function(callback) {
 };
 
 // end of ./src/js-query-engine/src/callbacks.js 
-//imports
-
-// exports
-var RDFStoreClient = {};
-
-
-try {
-    if(typeof(Worker)=='undefined') {
-        Worker = null;
-    };
-} catch(e) {
-    Worker = null;
-}
-
-// Checks if this is a webworker
-if(!!Worker) {
-
-    RDFStoreClient.RDFStoreClient = function(path_to_store_script, args, cb) {
-        console.log("trying to load "+path_to_store_script);
-        if(Worker.Worker) {
-            this.connection = new Worker.Worker(path_to_store_script);
-        } else {
-            this.connection = new Worker(path_to_store_script);
-        }
-        this.callbacksCounter = 1;
-        var that = this;
-        var creationCallback = function(success, result) {
-            if(success === true) {
-                cb(true, that);
-            } else {
-                cb(false, result);
-            }
-        };
-
-        this.rdf = RDFJSInterface.rdf;
-
-        console.log("The worker");
-        console.log(this.connection);
-        var that = this;
-        this.connection.onmessage = function(event){
-            that.receive(event);
-        };
-        this.observingCallbacks = {};
-        this.callbacks = {'0': {'cb':creationCallback, 'fn':'create'}};
-        this.connection.postMessage({'fn':'create', 'args':args, 'callback':'0'});
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.receive = function(packet) {
-        var event = packet.data || packet;
-        //console.log("RECEIVED SOMETHING");
-        if(event.fn === 'workerRequest:NetworkTransport:load') {
-            var that = this;
-            var workerCallback = event['callback'];
-            var args = event['arguments'].concat(function(success, results){
-                that.connection.postMessage({'fn':'workerRequestResponse', 'results':[success, results], 'callback':workerCallback});
-            });
-            NetworkTransport.load.apply(NetworkTransport,args);
-        } else {
-            var callbackData = this.callbacks[event.callback];
-            //console.log(packet);
-            //console.log(callbackData);
-            if(callbackData) {
-                if(callbackData.fn === 'create' || callbackData.fn === 'execute' || callbackData.fn === 'insert' || callbackData.fn == 'graph' ||
-                   callbackData.fn === 'node' || callbackData.fn === 'insert' || callbackData.fn === 'delete' || callbackData.fn === 'clear' ||
-                   callbackData.fn === 'load' || callbackData.fn === 'startObservingQueryEndCb' || callbackData.fn === 'registeredGraphs') {
-                    delete this.callbacks[event.callback];
-                    callbackData.cb(event.success, event.result);
-                } else if(callbackData.fn === 'startObservingQuery') {
-                    callbackData.cb(event.result);                
-                } else if(callbackData.fn === 'startObservingNode') {
-                    callbackData.cb(event.result);
-                } else if(callbackData.fn === 'subscribe') {
-                    callbackData.cb(event.event, event.result);
-                }
-            }
-        }
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.registerCallback = function(fn, callback) {
-        var id = ''+this.callbacksCounter;
-        this.callbacks[id] = {'fn':fn, 'cb':callback};
-        this.callbacksCounter++;
-
-        return id;
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.execute = function() {
-        if(arguments.length === 3) {
-            this.executeWithEnvironment(arguments[0],
-                                        arguments[1],
-                                        arguments[2]);
-        } else if(arguments.length === 4) {
-            this.executeWithEnvironment(arguments[0],
-                                        arguments[1],
-                                        arguments[2],
-                                        arguments[3]);
-        } else {
-
-            var queryString,callback;
-
-            if(arguments.length === 1) {
-                queryString = arguments[0];
-                callback = function(){};
-
-            } else if(arguments.length === 2) {
-                queryString = arguments[0];
-                callback = arguments [1];
-            }
-
-            var id = this.registerCallback('execute',callback);
-
-            this.connection.postMessage({'fn':'execute', 'args':[queryString], 'callback':id});
-        }
-
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.insert = function() {
-        var graph;
-        var triples;
-        var callback;
-        if(arguments.length === 1) {
-            triples = arguments[0];
-            this.connection.postMessage({'fn':'insert', 'args':[triples]})
-        } else if(arguments.length === 2) {
-            triples = arguments[0];
-            callback= arguments[1] || function(){};
-            var id = this.registerCallback('insert', callback);
-            this.connection.postMessage({'fn':'insert', 'args':[triples], 'callback':id})
-        } else if(arguments.length === 3) {
-            triples = arguments[0];
-            graph = arguments[1];
-            callback= arguments[2] || function(){};
-            var id = this.registerCallback('insert', callback);
-            this.connection.postMessage({'fn':'insert', 'args':[triples,graph], 'callback':id})
-        } else {
-            throw("The triples to insert, an optional graph and callback must be provided");
-        }
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.graph = function() {
-        var graphUri = null;
-        var callback = null;
-        if(arguments.length === 1) {
-            callback = arguments[0] || function(){};
-        } else if(arguments.length === 2) {
-            callback = arguments[1] || function(){};
-            graphUri = arguments[0];
-        } else {
-            throw("An optional graph URI and a callback function must be provided");
-        }
-
-        var that = this;
-        var wrapperCallback = function(success, toWrap) {
-            //console.log("CALLBACK!\n\n");
-            if(success) {
-                var triple;
-                for(var i=0; i<toWrap.triples.length; i++) {
-                    triple = toWrap.triples[i];
-                    toWrap.triples[i] = new RDFJSInterface.Triple(that.adaptJSInterface(triple.subject),
-                                                                  that.adaptJSInterface(triple.predicate),
-                                                                  that.adaptJSInterface(triple.object));
-                }                
-                callback(success, that.rdf.createGraph(toWrap.triples));
-            } else {
-                callback(success,toWrap);
-            }
-        };
-        var id = this.registerCallback('insert', wrapperCallback);
-        if(graphUri == null) {
-            this.connection.postMessage({'fn':'graph', 'args':[], 'callback':id})
-        } else {
-            this.connection.postMessage({'fn':'graph', 'args':[graphUri], 'callback':id})
-        }
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.node = function() {
-        var graphUri = null;
-        var callback = null;
-        var nodeUri  = null;
-        if(arguments.length === 2) {
-            nodeUri = arguments[0];
-            callback = arguments[1] || function(){};
-        } else if(arguments.length === 3) {
-            nodeUri = arguments[0];
-            graphUri = arguments[1];
-            callback = arguments[2] || function(){};
-        } else {
-            throw("An optional graph URI and a callback function must be provided");
-        }
-
-        var that = this;
-        var wrapperCallback = function(success, toWrap) {
-            //console.log("CALLBACK!\n\n");
-            if(success) {
-                var triple;
-                for(var i=0; i<toWrap.triples.length; i++) {
-                    triple = toWrap.triples[i];
-                    toWrap.triples[i] = new RDFJSInterface.Triple(that.adaptJSInterface(triple.subject),
-                                                                  that.adaptJSInterface(triple.predicate),
-                                                                  that.adaptJSInterface(triple.object));
-                }                
-                callback(success, that.rdf.createGraph(toWrap.triples));
-            } else {
-                callback(success,toWrap);
-            }
-        };
-        var id = this.registerCallback('insert', wrapperCallback);
-        if(graphUri == null) {
-            this.connection.postMessage({'fn':'node', 'args':[nodeUri], 'callback':id})
-        } else {
-            this.connection.postMessage({'fn':'node', 'args':[nodeUri, graphUri], 'callback':id})
-        }
-
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.setPrefix = function(prefix, uri) {
-        this.rdf.setPrefix(prefix, uri);
-        this.connection.postMessage({'fn':'rdf/setPrefix', 'args':[prefix, uri], 'callback':null})
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.setDefaultPrefix = function(uri) {
-        this.rdf.setDefaultPrefix(uri);
-        this.connection.postMessage({'fn':'rdf/setDefaultPrefix', 'args':[uri], 'callback':null})
-    };
-
-
-    RDFStoreClient.RDFStoreClient.prototype['delete'] = function() {
-        var graph;
-        var triples;
-        var callback;
-        if(arguments.length === 1) {
-            triples = arguments[0];
-            this.connection.postMessage({'fn':'delete', 'args':[triples]})
-        } else if(arguments.length === 2) {
-            triples = arguments[0];
-            callback= arguments[1] || function(){};
-            var id = this.registerCallback('delete', callback);
-            this.connection.postMessage({'fn':'delete', 'args':[triples], 'callback':id})
-        } else if(arguments.length === 3) {
-            triples = arguments[0];
-            graph = arguments[1];
-            callback= arguments[2] || function(){};
-            var id = this.registerCallback('delete', callback);
-            this.connection.postMessage({'fn':'delete', 'args':[triples,graph], 'callback':id})
-        } else {
-            throw("The triples to delete, an optional graph and callback must be provided");
-        }
-    };
-
-
-    RDFStoreClient.RDFStoreClient.prototype.clear = function() {
-        var graph;
-        var callback;
-     
-        if(arguments.length === 1) {
-            callback= arguments[0] || function(){};
-            var id = this.registerCallback('clear', callback);
-            this.connection.postMessage({'fn':'clear', 'args':[], 'callback':id})
-        } else if(arguments.length === 2) {
-            graph = arguments[0];
-            callback= arguments[1] || function(){};
-            var id = this.registerCallback('clear', callback);
-            this.connection.postMessage({'fn':'clear', 'args':[graph], 'callback':id})
-        } else {
-            throw("The optional graph and a callback must be provided");
-        }
-    };
-
-
-    /**
-     * Boolean value determining if loading RDF must produce
-     * triple add events and fire callbacks.
-     * Default is false.
-     */
-    RDFStoreClient.RDFStoreClient.prototype.setBatchLoadEvents = function(mustFireEvents){
-        this.connection.postMessage({'fn':'setBatchLoadEvents', 'args':[mustFireEvents]});
-    };
-
-    /**
-     * Registers a namespace prefix that will be automatically declared
-     * in all the queries
-     */
-    RDFStoreClient.RDFStoreClient.prototype.registerDefaultNamespace = function(ns, prefix) {
-        this.connection.postMessage({'fn':'registerDefaultNamespace', 'args':[ns,prefix]});
-    };
-     
-    /**
-     * Registers the default namespaces declared in the RDF JS Interfaces
-     * specification in the default Profile.
-     */
-    RDFStoreClient.RDFStoreClient.prototype.registerDefaultProfileNamespaces = function() {
-        this.connection.postMessage({'fn':'registerDefaultProfileNamespaces', 'args':[]});
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.load = function(){
-        var mediaType;
-        var data;
-        var graph;
-        var callback;
-     
-        if(arguments.length === 3) {
-            mediaType = arguments[0];
-            data = arguments[1];
-            callback= arguments[2] || function(){};
-            var id = this.registerCallback('load', callback);
-            this.connection.postMessage({'fn':'load', 'args':[mediaType, data], 'callback':id})
-        } else if(arguments.length === 4) {
-            mediaType = arguments[0];
-            data = arguments[1];
-            graph = arguments[2];
-            callback= arguments[3] || function(){};
-            var id = this.registerCallback('load', callback);
-            this.connection.postMessage({'fn':'load', 'args':[mediaType, data, graph], 'callback':id})
-        } else if(arguments.length === 2) {
-            throw("The mediaType of the parser, the data a callback and an optional graph must be provided");
-        }
-     
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.startObservingQuery = function() {
-        var query = arguments[0];
-        var callback = arguments[1];
-        var endCallback = arguments[2];
-        if(endCallback!=null) {
-            var id1 = this.registerCallback('startObservingQuery', callback);
-            this.observingCallbacks[query] = id1;
-            var id2 = this.registerCallback('startObservingQueryEndCb', endCallback);
-            this.connection.postMessage({'fn':'startObservingQuery', 'args':[query], 'callback':[id1,id2]})
-        } else {
-            var id1 = this.registerCallback('startObservingQuery', callback);
-            this.observingCallbacks[query] = id1;
-            this.connection.postMessage({'fn':'startObservingQuery', 'args':[query], 'callback':[id1]})
-        }
-    };
-     
-    RDFStoreClient.RDFStoreClient.prototype.stopObservingQuery = function(query) {
-        var id = this.observingCallbacks[query];
-        delete this.observingCallbacks[query];
-        delete this.callbacks[id];
-        this.connection.postMessage({'fn':'stopObservingQuery', 'args':[query], 'callback':[]})
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.startObservingNode = function() {
-        var uri, graphUri, callback;
-
-        if(arguments.length === 2) {
-            uri = arguments[0];
-            callback = arguments[1];
-
-            var that = this;
-            var wrapperCallback = function(toWrap) {
-                //console.log("CALLBACK!\n\n");
-                var triple;
-                for(var i=0; i<toWrap.triples.length; i++) {
-                    triple = toWrap.triples[i];
-                    toWrap.triples[i] = new RDFJSInterface.Triple(that.adaptJSInterface(triple.subject),
-                                                                  that.adaptJSInterface(triple.predicate),
-                                                                  that.adaptJSInterface(triple.object));
-                }                
-                callback(that.rdf.createGraph(toWrap.triples));
-            };
-
-            var id = this.registerCallback('startObservingNode', wrapperCallback);
-            this.observingCallbacks[callback] = id;
-
-            this.connection.postMessage({'fn':'startObservingNode', 'args':[uri], 'callback':id})
-        } else if(arguments.length === 3) {
-            uri = arguments[0];
-            graphUri = arguments[1];
-            callback = arguments[2];
-
-            var that = this;
-            var wrapperCallback = function(toWrap) {
-                //console.log("CALLBACK!\n\n");
-                var triple;
-                for(var i=0; i<toWrap.triples.length; i++) {
-                    triple = toWrap.triples[i];
-                    toWrap.triples[i] = new RDFJSInterface.Triple(that.adaptJSInterface(triple.subject),
-                                                                  that.adaptJSInterface(triple.predicate),
-                                                                  that.adaptJSInterface(triple.object));
-                }                
-                callback(that.rdf.createGraph(toWrap.triples));
-            };
-
-            var id = this.registerCallback('startObservingNode', wrapperCallback);
-            this.observingCallbacks[callback] = id;
-
-            this.connection.postMessage({'fn':'startObservingNode', 'args':[uri,graphUri], 'callback':id})
-        }
-    };
-     
-    RDFStoreClient.RDFStoreClient.prototype.stopObservingNode = function(callback) {
-        var id = this.observingCallbacks[callback];
-        delete this.observingCallbacks[callback];
-        delete this.callbacks[id];
-        //console.log("STOP OBSERVING "+id);
-        this.connection.postMessage({'fn':'stopObservingNode', 'args':[id], 'callback':[]})
-    };
-
-    RDFStoreClient.RDFStoreClient.prototype.subscribe = function(s, p, o, g, callback) {
-        var that = this;
-        var wrapperCallback = function(event,triples) {
-            //console.log("CALLBACK!\n\n");
-            var triple;
-            for(var i=0; i<triples.length; i++) {
-                triple = triples[i];
-                triples[i] = new RDFJSInterface.Triple(that.adaptJSInterface(triple.subject),
-                                                       that.adaptJSInterface(triple.predicate),
-                                                       that.adaptJSInterface(triple.object));
-            }                
-            callback(event,triples);
-        };
-        var id = this.registerCallback('subscribe', wrapperCallback);
-        this.observingCallbacks[callback] = id;
-
-        this.connection.postMessage({'fn':'subscribe', 'args':[s,p,o,g], 'callback':id});
-    };
-     
-    RDFStoreClient.RDFStoreClient.prototype.unsubscribe = function(callback) {
-        var id = this.observingCallbacks[callback];
-        delete this.observingCallbacks[callback];
-        delete this.callbacks[id];
-        //console.log("STOP OBSERVING "+id);
-        this.connection.postMessage({'fn':'unsubscribe', 'args':[id], 'callback':[]})
-    };
-         
-    RDFStoreClient.RDFStoreClient.prototype.registeredGraphs = function(callback) {
-        var that = this;
-        var wrapperCallback = function(success, graphs) {
-            //console.log("CALLBACK!\n\n");
-            if(success) {
-                var triple;
-                for(var i=0; i<graphs.length; i++) {
-                    var graph = graphs[i];
-                    graphs[i] = that.adaptJSInterface(graph);
-                }                
-                callback(success, graphs);
-            } else {
-                callback(success,graphs);
-            }
-        };
-
-        var id = this.registerCallback('registeredGraphs', wrapperCallback);
-        this.connection.postMessage({'fn':'registeredGraphs', 'args':[], 'callback':id})
-    };
-
-    // helper functions
-    RDFStoreClient.RDFStoreClient.prototype.adaptJSInterface = function(node) {
-        if(node.interfaceName === 'BlankNode') {
-            return new RDFJSInterface.BlankNode(node.bnodeId);
-        } else if(node.interfaceName === 'Literal') {
-            return new RDFJSInterface.Literal(node.nominalValue, node.language, node.datatype);
-        } else if(node.interfaceName === 'NamedNode') {
-            return new RDFJSInterface.NamedNode(node.nominalValue);
-        }
-    };
-
-    // make possible for clients to test if this i being executed inside a connection
-    RDFStoreClient.RDFStoreClient.prototype.isWebWorkerConnection = true;
-}
-
-// end of ./src/js-connection/src/rdfstore_client.js 
 // exports
 var MicrographQL = {};
 
@@ -9543,7 +8916,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
     var filterCounter = 0;
     if(expression['$id'] != null || !context.isQuery) {
 	if(expression['$id'] == null) {
-	    subject = MicrographQL.parseURI(null) // generates URI with next ID
+	    subject = MicrographQL.parseURI(null); // generates URI with next ID
 	    if(expression['$id'] == null) 
 		expression['$id'] = "object"+(MicrographQL.counter-1); // the previous ID
 
@@ -9657,14 +9030,21 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 		    } else {
 			if(expression[p].constructor == Array) {
 			    for(var i=0; i<expression[p].length; i++) {
-				// @todo check if this is a literal instead of an object
-				result = MicrographQL.parseBGP(expression[p][i], context, false, graph);
-				object = result[0];
-				context.quads = context.quads.concat(result[1]);
-				var quad = {'subject':subject, 'predicate':predicate, 'object':object};
-				if(graph != null)
-				    quad['graph'] = graph;
-				quads.push(quad);
+				if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
+				    result = MicrographQL.parseBGP(expression[p][i], context, false, graph);
+				    object = result[0];
+				    context.quads = context.quads.concat(result[1]);
+				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
+				    if(graph != null)
+					quad['graph'] = graph;
+				    quads.push(quad);
+				} else {
+				    object = MicrographQL.parseLiteral(expression[p][i]);
+				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
+				    if(graph != null)
+					quad['graph'] = graph;
+				    quads.push(quad);
+				}
 			    }
 			} else {
 			    if(expression[p]['token'] === 'var') {
@@ -9761,6 +9141,7 @@ try {
 // Query object
 var MicrographQuery = function(template) {
     this.template = template;
+    this.lastResult = null;
     this.filter = null;
 };
 
@@ -9806,21 +9187,31 @@ MicrographQuery.prototype.order = function(order) {
 
 MicrographQuery.prototype.all = function(callback) {
     this.kind = 'all';
-    this._executeQuery(callback);
+    var that = this;
+    this._executeQuery(function(result){
+	that.lastResult = result;
+	if(callback)
+	    callback(that.lastResult);
+    });
     return this.store;
 };
 
 MicrographQuery.prototype.first = function(callback) {
+    var that = this;
     this.all(function(res){
 	if(res.length > 0) {
-	    callback(res[0]);
+	    that.lastResult = res[0];
+	    if(callback)
+		callback(that.lastResult);
 	} else {
-	    callback(null);
+	    that.lastResult = null;
+	    if(callback)
+		callback(null);
 	}
     });
 
     return this.store;
-}
+};
 
 MicrographQuery.prototype.remove = function(callback) {
     this.kind = 'remove';
@@ -10324,6 +9715,14 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 			}
 		    });
 		}
+	    }  else {
+		if(isTopLevel) {
+		    var node = nodes[id];
+		    if(node && pushed[node['$id']] == null) {
+			pushed[node['$id']] = node;
+			toReturn.push(node);
+		    }
+		}
 	    }
 	}
     }
@@ -10331,8 +9730,116 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
     return toReturn;
 }
 // end of ./src/micrograph/src/micrograph_query.js 
+// exports
+var MicrographClass = {};
+
+
+MicrographClass.registry = {};
+MicrographClass.definitionOrder = [];
+MicrographClass.Clone = function(){};
+
+MicrographClass.reset = function(classExpression, object) {
+    MicrographClass.registry = {};
+    MicrographClass.definitionOrder = [];
+};
+
+MicrographClass.define = function(classExpression, object) {
+    classExpression = classExpression.replace(/\s*/g,"");
+    MicrographClass.registry[classExpression] = object;
+    MicrographClass.definitionOrder.push(classExpression);
+};
+
+MicrographClass.instance = function() {
+    var classUri = arguments[0];
+    var base = arguments[1] || {};
+
+    var classPrototype = MicrographClass.registry[classUri];
+    MicrographClass.Clone.prototype = classPrototype;
+    var clone = new MicrographClass.Clone();
+
+    base.init = null;
+
+    for(var p in clone) {
+        if(base[p] == null) {
+	    base[p] = clone[p];
+        }
+    }
+    if(base['init'] && typeof(base['init'])==='function') {
+        base['init']();
+	delete base['init'];
+    }
+    
+    return base;    
+};
+
+
+MicrographClass.check = function(resource) {
+    var isFirstRun = arguments[1] || true;
+
+    resource['__micrograph__classes'] = resource['__micrograph__classes'] || {};
+
+    var p;
+    for(var i=0; i<MicrographClass.definitionOrder.length; i++) {
+	p = MicrographClass.definitionOrder[i];
+        if(MicrographClass.isInstance(resource, p)) {
+            if(isFirstRun || resource['__micrograph__classes'][p] == null) {
+                MicrographClass.instance(p,resource)
+            }
+            resource['__micrograph__classes'][p] = true;
+        } else {
+            if(resource['__micrograph__classes'][p] != null) {
+                delete resource.classes[p];
+                for(var m in MicrographClass.registry[p]) {
+                    delete resource[m];
+                }
+            }
+        }
+    }
+};
+
+
+MicrographClass.isInstance = function(resource, klass) {
+    if(klass.indexOf("and(") === 0) {
+        var parts = klass.slice(0,klass.length-1).split("and(")[1].split(",");
+            if(!MicrographClass.isInstance(resource, parts[i])) {
+                return false;
+            }
+        return true;
+    } else if(klass.indexOf("or(") === 0) {
+        var parts = klass.slice(0,klass.length-1).split("or(")[1].split(",");
+        for(var i=0; i<parts.length; i++) {
+            if(MicrographClass.isInstance(resource, parts[i])) {
+                return true;
+            }
+        }
+        return false;
+    } else if(klass.indexOf("prop(") === 0) {
+        var propertyUri = klass.slice(0,klass.length-1).split("prop(")[1];
+        return resource[propertyUri] != null
+    } else if(klass.indexOf("not(") === 0) {
+        var expression = klass.slice(0,klass.length-1).split("not(")[1];
+	return !MicrographClass.isInstance(resource,expression);
+    } else {
+	if(resource['$type']) {
+	    if(typeof(resource['$type']) === 'object') {
+		for(var i=0; i<resource['$type'].length; i++) {
+		    if(resource['$type'][i] === klass)
+			return true;
+		}
+		return false;
+	    } else {
+		return resource['$type'] === klass
+	    }
+	} else {
+	    return false;
+	}        
+    }
+};
+
+// end of ./src/micrograph/src/micrograph_class.js 
 // imports
 var MongodbQueryEngine = { MongodbQueryEngine: function(){ throw 'MongoDB backend not supported in the browser version' } };
+
 
 /*
 var sys = null;
@@ -10355,6 +9862,10 @@ var Micrograph = function(options, callback) {
     this.callbackCounter = 0;
     this.callbackToNodes = {};
     this.nodesToCallbacks = {};
+    this.lastQuery = null;
+    this.lastDataToLoad = null;
+    this.errorCallback = null;
+    this.transformFunction = null;
 
     for(var i=0; i<Micrograph.vars.length; i++) {
 	this['_'+Micrograph.vars[i]] = this._(Micrograph.vars[i]);
@@ -10415,6 +9926,11 @@ Micrograph.VERSION = "0.2.0";
 
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
+Micrograph.prototype.onError = function(cb) {
+    this.errorCallback = cb;
+    return this;
+};
+
 Micrograph.create = function() {
     var callback, options;
 
@@ -10447,8 +9963,14 @@ Micrograph.open = function(name,overwrite,options,callback) {
     new Micrograph(options, callback);
 };
 
-Micrograph.prototype.execute = function(query, callback) {
-    this.engine.execute(query,callback);
+Micrograph.prototype.define = function(classExpression, object) {
+    MicrographClass.define(classExpression, object);
+    return this;
+};
+
+Micrograph.prototype.instantiate = function(object) {
+    MicrographClass.check(object);
+    return this;
 };
 
 Micrograph.prototype.startGraphModification = function() {
@@ -10459,11 +9981,34 @@ Micrograph.prototype.endGraphModification = function() {
     this.engine.endGraphModification();
 };
 
+Micrograph.prototype.execute = function(query, callback) {
+    this.startGraphModification();
+    this.engine.execute(query,callback);
+    this.endGraphModification();
+    return this;
+};
+
 Micrograph.prototype.where = function(query) {
     var queryObj =  new MicrographQuery(query);
+    this.lastQuery = queryObj;
     queryObj.setStore(this);
     return queryObj;
 };
+
+Micrograph.prototype.instances = function(callback) {
+    if(this.lastQuery.lastResult && this.lastQuery.lastResult.constructor === Array) {
+	for(var i=0; i<this.lastQuery.lastResult.length; i++)
+	    this.instantiate(this.lastQuery.lastResult[i]);
+	callback(this.lastQuery.lastResult);
+    } else if(this.lastQuery.lastResult) {
+	this.instantiate(this.lastQuery.lastResult);
+	callback(this.lastQuery.lastResult);
+    } else {
+	callback(null);
+    }
+    return this;
+};
+
 
 Micrograph.prototype._ = function(varName) {
     return {'token': 'var', 'value':varName };
@@ -10476,28 +10021,64 @@ Micrograph.prototype.load = function() {
     var callback;
     var that = this;
 
-    if(arguments.length == 1)
-	callback = function(){};
 
-    if(arguments.length < 3) {
-	if(MicrographQL.isUri(typeof(arguments[0]) === "string" && arguments[0])) {
-	    mediaType = "remote";
+    if(arguments.length == 1) {
+	if(typeof(arguments[0]) === 'function') {
+	    callback = arguments[0];
 	} else {
-	    mediaType = "application/json";
+	    data  = arguments[0];
+	    callback = function(){};
 	}
-
-        graph = {'token':'uri', 'value': this.engine.lexicon.defaultGraphUri};
-
+    } else if(arguments.length == 2) {
 	data = arguments[0];
 	callback = arguments[1];
     } else {
 	throw "Data to be loaded and an optional callback function must be specified";
+    }
+    
+    mediaType = "application/json";
+    graph = {'token':'uri', 'value': this.engine.lexicon.defaultGraphUri};
+
+    if(this.lastDataToLoad != null) {
+	var options = this.lastDataToLoad;
+	this.lastDataToLoad = null;
+	if(options['jsonp'] != null) {
+	    Micrograph.jsonp(options['uri'], function(data) {
+		that.load(data,callback);
+	    }, this.errorCallback, options['jsonp']);
+	} else {
+	    Micrograph.ajax('GET', options['uri'], null, function(data){
+		that.load(data,callback);
+	    }, this.errorCallback);
+	}
+	return this;
     }
 
     if(typeof(data) === "object") {
 	if(data.constructor !== Array) {
 	    data = [data];
 	}
+
+	if(this.transformFunction != null) {
+	    var acum = [[null,data]];
+	    var current;
+	    while(acum.length > 0) {
+		current = acum.pop();
+		if(current[1].constructor === Array) {
+		    for(var i=0; i<current[1].length; i++)
+			acum.push([current[0], current[1][i]]);
+		} else {
+		    this.transformFunction(current[0],current[1]);
+		    for(var p in current[1]) {
+			if(current[1][p] && typeof(current[1][p]) === 'object' && current[1][p].constructor != Date) 
+			    acum.push([p,current[1][p]]);
+		    }
+		}
+	    }
+	}
+	// clean the transform function
+	this.transformFunction = null;
+
 	var quads;
 	var that = this;
 
@@ -10513,19 +10094,6 @@ Micrograph.prototype.load = function() {
 	}
 	if(callback)
 	    callback(data);
-    } else {
-
-        var parser = this.engine.rdfLoader.parsers[mediaType];
-
-        var that = this;
-
-        this.engine.rdfLoader.tryToParse(parser, {'token':'uri', 'value':graph.valueOf()}, data, function(success, quads) {
-	    if(success) {
-                that.engine.batchLoad(quads,callback);
-	    } else {
-                callback(success, quads);
-	    }
-        });
     }
 
     return this;
@@ -10557,7 +10125,7 @@ Micrograph.prototype.update = function(json, cb) {
 	})
 	that.engine.endGraphModification();
     }
-}
+};
 
 Micrograph.prototype.bind = function(query, callback) {
     // execution
@@ -10582,7 +10150,135 @@ Micrograph.prototype.bind = function(query, callback) {
     this.callbackMap[queryIdentifier] = innerCallback;
 
     this.engine.callbacksBackend.observeQuery(queryIdentifier, query.query,innerCallback,function() {});
-}
+};
+
+Micrograph.prototype.from = function(uri, options, callback) {
+    if(options == null) {
+	options = {};
+    } else if(typeof(options) === 'function'){
+	callback = options
+	options = {};
+    }
+
+    if(uri.indexOf("?") != -1 && 
+       uri.split("?")[1].indexOf("callback") != -1 &&
+       options['jsonp'] == null) {
+	options['jsonp'] = 'callback';
+    }
+
+    options['uri'] = uri;
+    if(callback != null) {
+	this.lastDataToLoad = null;
+	if(options['jsonp'] != null) {
+	    Micrograph.jsonp(options['uri'], callback, this.errorCallback, this.options['jsonp'])
+	} else {
+	    Micrograph.ajax('GET', options['uri'], null, callback, this.errorCallback)
+	}
+    } else {
+	this.lastDataToLoad = options;
+    }
+
+    return this;
+};
+
+Micrograph.prototype.transform = function(f) {
+    this.transformFunction = f;
+    return this;
+};
+
+Micrograph.ajax = function(method, url, data, callback, errorCallback) {
+
+    var xhr = new XMLHttpRequest();
+
+    if (typeof XDomainRequest != "undefined") {
+	// XDomainRequest for IE.
+	xhr = new XDomainRequest();
+	xhr.open(method, url);
+    } else {
+	xhr.open(method, url, true);
+    }
+
+    if (xhr.overrideMimeType) xhr.overrideMimeType("application/json");
+    if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", "application/json");
+
+    xhr.onreadystatechange = function() {
+	if (xhr.readyState === 4) {
+	    if(xhr.status < 300 && xhr.status !== 0)
+		callback(JSON.parse(xhr.responseText));
+	    else
+		errorCallback(xhr.statusText);
+	}
+    };
+
+    xhr.send(data);
+};
+
+Micrograph.jsonpCallbackCounter = 0;
+Micrograph.jsonpRequestsConfirmations = {};
+Micrograph.jsonpRetries = {};
+
+Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, ignore) {
+    ignore = ignore || false;
+    var cbHandler = "jsonp"+Micrograph.jsonpallbackCounter;
+    Micrograph.jsonpCallbackCounter++;
+
+    if(callbackParameter == null)
+	callbackParameter = "callback";
+
+    var uri = fragment;
+	
+    
+    if(uri.indexOf("?") === -1) {
+	uri = uri + "?"+callbackParameter+"="+cbHandler;
+    } else {
+	if(uri.split("?")[1].indexOf(callbackParameter+"=") == -1) {
+	    uri = uri + "&"+callbackParameter+"="+cbHandler;
+	} else {
+	    cbHandler = uri.split("?")[1].split(callbackParameter+"=")[1].split("&")[0];
+	}
+    }
+
+    if(Micrograph.jsonpRetries[uri] == null) {
+	Micrograph.jsonpRetries[uri] = 0;
+    } else {
+	Micrograph.jsonpRetries[uri] = Micrograph.jsonpRetries[uri]+1;
+    }
+    window[cbHandler] = function(data) {
+	Micrograph.jsonpRequestsConfirmations[uri] = true;
+	callback(data);
+    };
+
+    setTimeout(function() {
+	if(Micrograph.jsonpRequestsConfirmations[uri] === true) {
+	    delete Micrograph.jsonpRetries[uri];
+	    delete Micrograph.jsonpRequestsConfirmations[uri];
+	    delete window[cbHandler];
+	} else {
+	    if(Micrograph.jsonpRetries[uri] < 1) {
+		console.log("(!!) JSONP error, retyring...");
+		console.log(fragment);
+		console.log(callbackParameter);
+		delete window[cbHandler];
+		if(ignore) {
+		    callback(null);
+		} else {
+		    Micrograph.jsonp(fragment, callback, errorCallback, callbackParameter, ignore);
+		}
+	    } else {
+		delete Micrograph.jsonpRetries[uri];
+		delete Micrograph.jsonpRequestsConfirmations[uri];
+		delete window[cbHandler];
+		if(errorCallback)
+		    errorCallback();
+	    }
+	}
+    }, 15000);
+
+    var script = document.createElement('script');
+    script.setAttribute('type','text/javascript');
+    script.setAttribute('src', uri);
+    document.getElementsByTagName('head')[0].appendChild(script); 
+};
 // end of ./src/micrograph/src/micrograph.js 
 try {
   if(typeof(window) === 'undefined')

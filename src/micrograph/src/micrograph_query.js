@@ -14,6 +14,7 @@ try {
 // Query object
 exports.MicrographQuery = function(template) {
     this.template = template;
+    this.lastResult = null;
     this.filter = null;
 };
 var MicrographQuery = exports.MicrographQuery;
@@ -60,21 +61,31 @@ MicrographQuery.prototype.order = function(order) {
 
 MicrographQuery.prototype.all = function(callback) {
     this.kind = 'all';
-    this._executeQuery(callback);
+    var that = this;
+    this._executeQuery(function(result){
+	that.lastResult = result;
+	if(callback)
+	    callback(that.lastResult);
+    });
     return this.store;
 };
 
 MicrographQuery.prototype.first = function(callback) {
+    var that = this;
     this.all(function(res){
 	if(res.length > 0) {
-	    callback(res[0]);
+	    that.lastResult = res[0];
+	    if(callback)
+		callback(that.lastResult);
 	} else {
-	    callback(null);
+	    that.lastResult = null;
+	    if(callback)
+		callback(null);
 	}
     });
 
     return this.store;
-}
+};
 
 MicrographQuery.prototype.remove = function(callback) {
     this.kind = 'remove';
@@ -577,6 +588,14 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 			    pushed[node['$id']] = true;
 			}
 		    });
+		}
+	    }  else {
+		if(isTopLevel) {
+		    var node = nodes[id];
+		    if(node && pushed[node['$id']] == null) {
+			pushed[node['$id']] = node;
+			toReturn.push(node);
+		    }
 		}
 	    }
 	}

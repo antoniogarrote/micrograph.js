@@ -110,7 +110,7 @@ QuadBackend.QuadBackend.prototype.search = function (quad, callback) {
     if (callback)
         callback(result != null);
 
-    return (result != null)
+    return (result != null);
 };
 
 

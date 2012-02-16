@@ -14,15 +14,15 @@ BUILD_CONFIGURATION = {
                  "./src/js-rdf-persistence/src/quad_backend.js",
                  "./src/js-rdf-persistence/src/web_local_storage_lexicon.js",
                  "./src/js-rdf-persistence/src/lexicon.js",
-                 "./src/js-communication/src/ajax_transport.js",
                  "./src/js-sparql-parser/src/abstract_query_tree.js",
                  "./src/js-query-engine/src/query_filters.js",
                  "./src/js-query-engine/src/query_plan_sync_dpsize.js",
                  "./src/js-query-engine/src/query_engine.js",
                  "./src/js-query-engine/src/callbacks.js",
-                 "./src/js-connection/src/rdfstore_client.js",
+                 # "./src/js-connection/src/rdfstore_client.js",
                  "./src/micrograph/src/micrograph_ql.js",
                  "./src/micrograph/src/micrograph_query.js",
+                 "./src/micrograph/src/micrograph_class.js",
                  "./src/micrograph/src/micrograph.js"
                 ]
   }

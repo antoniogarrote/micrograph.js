@@ -260,7 +260,6 @@ exports.instantiation7 = function(test) {
 
     test.ok(instance.name === 'Ludwig');
     test.ok(instance.nationality() === 'apatride');
-    console.log(instance.__lastType);
     test.ok(instance.__lastType === 'undefinedPersonPhilosopherLogician');
     test.ok(instance._isPerson === true);
     test.ok(instance._isPhilosopher === true);

@@ -9,6 +9,8 @@ var WebLocalStorageBTree = require("./../../js-trees/src/web_local_storage_b_tre
 
 var MicrographQuery = require('./micrograph_query').MicrographQuery;
 var MicrographQL = require('./micrograph_ql').MicrographQL;
+var MicrographClass = require('./micrograph_class').MicrographClass;
+
 /*
 var sys = null;
 try {
@@ -30,6 +32,10 @@ var Micrograph = function(options, callback) {
     this.callbackCounter = 0;
     this.callbackToNodes = {};
     this.nodesToCallbacks = {};
+    this.lastQuery = null;
+    this.lastDataToLoad = null;
+    this.errorCallback = null;
+    this.transformFunction = null;
 
     for(var i=0; i<Micrograph.vars.length; i++) {
 	this['_'+Micrograph.vars[i]] = this._(Micrograph.vars[i]);
@@ -91,6 +97,11 @@ Micrograph.VERSION = "0.2.0";
 
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
+Micrograph.prototype.onError = function(cb) {
+    this.errorCallback = cb;
+    return this;
+};
+
 Micrograph.create = function() {
     var callback, options;
 
@@ -123,8 +134,14 @@ Micrograph.open = function(name,overwrite,options,callback) {
     new Micrograph(options, callback);
 };
 
-Micrograph.prototype.execute = function(query, callback) {
-    this.engine.execute(query,callback);
+Micrograph.prototype.define = function(classExpression, object) {
+    MicrographClass.define(classExpression, object);
+    return this;
+};
+
+Micrograph.prototype.instantiate = function(object) {
+    MicrographClass.check(object);
+    return this;
 };
 
 Micrograph.prototype.startGraphModification = function() {
@@ -135,11 +152,34 @@ Micrograph.prototype.endGraphModification = function() {
     this.engine.endGraphModification();
 };
 
+Micrograph.prototype.execute = function(query, callback) {
+    this.startGraphModification();
+    this.engine.execute(query,callback);
+    this.endGraphModification();
+    return this;
+};
+
 Micrograph.prototype.where = function(query) {
     var queryObj =  new MicrographQuery(query);
+    this.lastQuery = queryObj;
     queryObj.setStore(this);
     return queryObj;
 };
+
+Micrograph.prototype.instances = function(callback) {
+    if(this.lastQuery.lastResult && this.lastQuery.lastResult.constructor === Array) {
+	for(var i=0; i<this.lastQuery.lastResult.length; i++)
+	    this.instantiate(this.lastQuery.lastResult[i]);
+	callback(this.lastQuery.lastResult);
+    } else if(this.lastQuery.lastResult) {
+	this.instantiate(this.lastQuery.lastResult);
+	callback(this.lastQuery.lastResult);
+    } else {
+	callback(null);
+    }
+    return this;
+};
+
 
 Micrograph.prototype._ = function(varName) {
     return {'token': 'var', 'value':varName };
@@ -152,28 +192,64 @@ Micrograph.prototype.load = function() {
     var callback;
     var that = this;
 
-    if(arguments.length == 1)
-	callback = function(){};
 
-    if(arguments.length < 3) {
-	if(MicrographQL.isUri(typeof(arguments[0]) === "string" && arguments[0])) {
-	    mediaType = "remote";
+    if(arguments.length == 1) {
+	if(typeof(arguments[0]) === 'function') {
+	    callback = arguments[0];
 	} else {
-	    mediaType = "application/json";
+	    data  = arguments[0];
+	    callback = function(){};
 	}
-
-        graph = {'token':'uri', 'value': this.engine.lexicon.defaultGraphUri};
-
+    } else if(arguments.length == 2) {
 	data = arguments[0];
 	callback = arguments[1];
     } else {
 	throw "Data to be loaded and an optional callback function must be specified";
+    }
+    
+    mediaType = "application/json";
+    graph = {'token':'uri', 'value': this.engine.lexicon.defaultGraphUri};
+
+    if(this.lastDataToLoad != null) {
+	var options = this.lastDataToLoad;
+	this.lastDataToLoad = null;
+	if(options['jsonp'] != null) {
+	    Micrograph.jsonp(options['uri'], function(data) {
+		that.load(data,callback);
+	    }, this.errorCallback, options['jsonp']);
+	} else {
+	    Micrograph.ajax('GET', options['uri'], null, function(data){
+		that.load(data,callback);
+	    }, this.errorCallback);
+	}
+	return this;
     }
 
     if(typeof(data) === "object") {
 	if(data.constructor !== Array) {
 	    data = [data];
 	}
+
+	if(this.transformFunction != null) {
+	    var acum = [[null,data]];
+	    var current;
+	    while(acum.length > 0) {
+		current = acum.pop();
+		if(current[1].constructor === Array) {
+		    for(var i=0; i<current[1].length; i++)
+			acum.push([current[0], current[1][i]]);
+		} else {
+		    this.transformFunction(current[0],current[1]);
+		    for(var p in current[1]) {
+			if(current[1][p] && typeof(current[1][p]) === 'object' && current[1][p].constructor != Date) 
+			    acum.push([p,current[1][p]]);
+		    }
+		}
+	    }
+	}
+	// clean the transform function
+	this.transformFunction = null;
+
 	var quads;
 	var that = this;
 
@@ -189,19 +265,6 @@ Micrograph.prototype.load = function() {
 	}
 	if(callback)
 	    callback(data);
-    } else {
-
-        var parser = this.engine.rdfLoader.parsers[mediaType];
-
-        var that = this;
-
-        this.engine.rdfLoader.tryToParse(parser, {'token':'uri', 'value':graph.valueOf()}, data, function(success, quads) {
-	    if(success) {
-                that.engine.batchLoad(quads,callback);
-	    } else {
-                callback(success, quads);
-	    }
-        });
     }
 
     return this;
@@ -233,7 +296,7 @@ Micrograph.prototype.update = function(json, cb) {
 	})
 	that.engine.endGraphModification();
     }
-}
+};
 
 Micrograph.prototype.bind = function(query, callback) {
     // execution
@@ -258,4 +321,132 @@ Micrograph.prototype.bind = function(query, callback) {
     this.callbackMap[queryIdentifier] = innerCallback;
 
     this.engine.callbacksBackend.observeQuery(queryIdentifier, query.query,innerCallback,function() {});
-}
+};
+
+Micrograph.prototype.from = function(uri, options, callback) {
+    if(options == null) {
+	options = {};
+    } else if(typeof(options) === 'function'){
+	callback = options
+	options = {};
+    }
+
+    if(uri.indexOf("?") != -1 && 
+       uri.split("?")[1].indexOf("callback") != -1 &&
+       options['jsonp'] == null) {
+	options['jsonp'] = 'callback';
+    }
+
+    options['uri'] = uri;
+    if(callback != null) {
+	this.lastDataToLoad = null;
+	if(options['jsonp'] != null) {
+	    Micrograph.jsonp(options['uri'], callback, this.errorCallback, this.options['jsonp'])
+	} else {
+	    Micrograph.ajax('GET', options['uri'], null, callback, this.errorCallback)
+	}
+    } else {
+	this.lastDataToLoad = options;
+    }
+
+    return this;
+};
+
+Micrograph.prototype.transform = function(f) {
+    this.transformFunction = f;
+    return this;
+};
+
+Micrograph.ajax = function(method, url, data, callback, errorCallback) {
+
+    var xhr = new XMLHttpRequest();
+
+    if (typeof XDomainRequest != "undefined") {
+	// XDomainRequest for IE.
+	xhr = new XDomainRequest();
+	xhr.open(method, url);
+    } else {
+	xhr.open(method, url, true);
+    }
+
+    if (xhr.overrideMimeType) xhr.overrideMimeType("application/json");
+    if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", "application/json");
+
+    xhr.onreadystatechange = function() {
+	if (xhr.readyState === 4) {
+	    if(xhr.status < 300 && xhr.status !== 0)
+		callback(JSON.parse(xhr.responseText));
+	    else
+		errorCallback(xhr.statusText);
+	}
+    };
+
+    xhr.send(data);
+};
+
+Micrograph.jsonpCallbackCounter = 0;
+Micrograph.jsonpRequestsConfirmations = {};
+Micrograph.jsonpRetries = {};
+
+Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, ignore) {
+    ignore = ignore || false;
+    var cbHandler = "jsonp"+Micrograph.jsonpallbackCounter;
+    Micrograph.jsonpCallbackCounter++;
+
+    if(callbackParameter == null)
+	callbackParameter = "callback";
+
+    var uri = fragment;
+	
+    
+    if(uri.indexOf("?") === -1) {
+	uri = uri + "?"+callbackParameter+"="+cbHandler;
+    } else {
+	if(uri.split("?")[1].indexOf(callbackParameter+"=") == -1) {
+	    uri = uri + "&"+callbackParameter+"="+cbHandler;
+	} else {
+	    cbHandler = uri.split("?")[1].split(callbackParameter+"=")[1].split("&")[0];
+	}
+    }
+
+    if(Micrograph.jsonpRetries[uri] == null) {
+	Micrograph.jsonpRetries[uri] = 0;
+    } else {
+	Micrograph.jsonpRetries[uri] = Micrograph.jsonpRetries[uri]+1;
+    }
+    window[cbHandler] = function(data) {
+	Micrograph.jsonpRequestsConfirmations[uri] = true;
+	callback(data);
+    };
+
+    setTimeout(function() {
+	if(Micrograph.jsonpRequestsConfirmations[uri] === true) {
+	    delete Micrograph.jsonpRetries[uri];
+	    delete Micrograph.jsonpRequestsConfirmations[uri];
+	    delete window[cbHandler];
+	} else {
+	    if(Micrograph.jsonpRetries[uri] < 1) {
+		console.log("(!!) JSONP error, retyring...");
+		console.log(fragment);
+		console.log(callbackParameter);
+		delete window[cbHandler];
+		if(ignore) {
+		    callback(null);
+		} else {
+		    Micrograph.jsonp(fragment, callback, errorCallback, callbackParameter, ignore);
+		}
+	    } else {
+		delete Micrograph.jsonpRetries[uri];
+		delete Micrograph.jsonpRequestsConfirmations[uri];
+		delete window[cbHandler];
+		if(errorCallback)
+		    errorCallback();
+	    }
+	}
+    }, 15000);
+
+    var script = document.createElement('script');
+    script.setAttribute('type','text/javascript');
+    script.setAttribute('src', uri);
+    document.getElementsByTagName('head')[0].appendChild(script); 
+};
