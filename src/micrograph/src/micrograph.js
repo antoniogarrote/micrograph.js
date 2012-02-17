@@ -140,7 +140,23 @@ Micrograph.prototype.define = function(classExpression, object) {
 };
 
 Micrograph.prototype.instantiate = function(object) {
+    if(object['__micrograph__classes'] != null) {
+	return this;
+    }
+    
     MicrographClass.check(object);
+    for(var p in object) {
+	if(typeof(object[p]) === 'object' && object[p]!=null) {
+	    if(object[p].constructor == Array) {
+		for(var i=0; i<object[p].length; i++)
+		    if(typeof(object[p][i]) === 'object' && object[p][i].$id)
+			this.instantiate(object[p][i]);
+	    } else {
+		if(object[p].$id)
+		    this.instantiate(object[p]);
+	    }
+	}
+    }
     return this;
 };
 

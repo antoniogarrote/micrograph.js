@@ -1,0 +1,207 @@
+<!doctype html>
+
+<!--[if lt IE 7 ]>
+    <html class="no-js ie6" lang="en"> <![endif]-->
+<!--[if IE 7 ]>
+    <html class="no-js ie7" lang="en"> <![endif]-->
+<!--[if IE 8 ]>
+    <html class="no-js ie8" lang="en"> <![endif]-->
+<!--[if (gte IE 9)|!(IE)]><!-->
+<html class="no-js" lang="en"> <!--<![endif]-->
+
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Example 1</title>
+    <meta name="author" content="Antonio Garrote">
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="./js/d3.js"></script>
+    <script type="text/javascript" src="./js/ko.js"></script>
+    <script type="text/javascript" src="./js/micrograph.js"></script>
+
+    <script type="text/javascript">
+    window.onload = function() {
+	var load = function(user,project) {
+	    $('#graph-chart').empty();
+
+            mg.create(function(g) {
+		g.define('Commit', {color: 'orange',
+				    radius: function(){ return 5 },
+				    opacity: 0.8,
+			            treeParents: function() { if(this.parents) {
+					return (this.parents.length ? this.parents : [this.parents])
+				    } else {
+					return [];
+				    }},
+			            addNodesLinks: function(nodes, links, nodesMap){
+					if(nodesMap[this.$id] == null) {
+					    nodesMap[this.$id] = true;
+					    nodes.push(this);
+					    for(var i=0; i<this.treeParents().length; i++) {
+						var parent = this.treeParents()[i];
+						if(parent.addNodesLinks) {
+						    parent.addNodesLinks(nodes,links,nodesMap);
+						    links.push({source:this, target:this.treeParents()[i]});
+						}
+
+					    }
+					}
+				    }})
+		    .define('Person', {color: 'lightBlue',
+				       committed: function(){ return (this.author$in.length ? this.author$in : [this.author$in]); },
+				       radius: function(){ return 30+(5*this.committed().length) },
+				       opacity: 0.3,
+				       addNodesLinks: function(nodes, links, nodesMap) {
+					   if(nodesMap[this.$id] == null) {
+					       nodesMap[this.$id] = true;
+					       nodes.push(this);
+					   }
+
+					   for(var i=0; i<this.committed().length; i++) {
+					       var commit = this.committed()[i];
+					       commit.addNodesLinks(nodes,links,nodesMap);
+					       links.push({source:this, target: commit})
+					   } 
+				       }})
+		    .from("https://api.github.com/repos/"+user+"/"+project+"/commits?callback=loadCommits&per_page=100")
+		    .transform(function(prop,obj) {
+			if(prop == null) {
+			    delete obj.meta;
+			} else if(prop === 'data') {
+			    obj.$id = obj.url;
+			    obj.$type = 'Commit';
+			    obj.message = obj.commit.message;
+			    obj.tree = obj.commit.tree;
+			    if(obj.author && obj.commit.author) {
+          			obj.author.email = obj.commit.author.email;
+				obj.author.name = obj.commit.author.name;
+			    }
+			    obj.date = new Date(obj.commit.author.date);
+			    delete obj.commit;
+			} else if(prop === 'committer' || prop === 'author') {
+			    obj.$id = obj.url;
+			    obj.$type = 'Person';
+			} else if(prop === 'parents' || prop === 'tree') {
+			    obj.$id = obj.url;
+			    obj.$type = 'Commit';
+			    delete obj.url;
+			    delete obj.sha;
+			}
+		    })
+		    .load(function() {		     
+			g.where({$type: 'Person', 
+				 author$in:{ parents:{}}})
+			    .all()
+			    .instances(function(authors) {
+				var links = [];
+				var nodes = [];
+				var nodesMap = {};
+
+				for(var i=0; i<authors.length; i++)
+				    authors[i].addNodesLinks(nodes,links,nodesMap);
+
+				var w = 1200;
+				var h = 900;
+				var vis = d3.select("#graph-chart").append("svg:svg").
+				    attr("width",w).
+				    attr("height",h);
+
+				var force = d3.layout.force()
+				    .charge(-180)
+				    .linkDistance(30)
+				    .nodes(nodes)
+				    .links(links)
+				    .size([w,h])
+				    .start();
+
+				var link = vis.selectAll("link.link")
+				    .data(links)
+				    .enter().append("svg:line")
+				    .style("stroke-width", function(d) { return 1; })
+				    .style("stroke", "#999999")
+				    .style("stroke-opacity", 0.6)
+				    .attr("x1", function(d) { return d.source.x; })
+				    .attr("y1", function(d) { return d.source.y; })
+				    .attr("x2", function(d) { return d.target.x; })
+				    .attr("y2", function(d) { return d.target.y; });
+
+				var node = vis.selectAll("g.node")
+				    .data(nodes)
+				    .enter().append("g")
+				    .attr("class", "node");
+
+				node.append("svg:title")
+			       	    .text(function(d) { return d.$id });
+
+				node.append("svg:circle")
+				    .attr("cx", function(d) { return d.x; })
+				    .attr("cy", function(d) { return d.y; })
+				    .attr("r", function(d){ return d.radius(); })
+				    .style("fill", function(d){  return d.color })
+				    .style("fill-opacity",function(d){ return d.opacity })
+				    .attr('class', function(d){ return d.$type })
+				    .call(force.drag);
+
+				node.filter(function(d){ return d.$type === 'Person'})
+				    .append("image")
+				    .attr("width","32")
+				    .attr("height","32")
+				    .attr("x","-16")
+				    .attr("y","-16")
+				    .attr("xlink:href",function(d){ return d.avatar_url; })
+				    .call(force.drag);
+
+
+				force.on("tick", function() {
+				    link.attr("x1", function(d) { return d.source.x; })
+					.attr("y1", function(d) { return d.source.y; })
+					.attr("x2", function(d) { return d.target.x; })
+					.attr("y2", function(d) { return d.target.y; });
+				    
+				    node.select("circle")
+					.attr("cx", function(d) { return d.x; })
+					.attr("cy", function(d) { return d.y; });
+
+				    node.select("image")
+					.attr("x",function(d){ return d.x - 16})
+					.attr("y",function(d){ return d.y - 16});
+				});
+			    });
+		    });
+	    });
+
+	}
+	var viewModel = {
+	    user: ko.observable('forward'),
+	    repo: ko.observable('mandy')
+	};
+
+	viewModel.compute = function() {
+	    load(this.user(), this.repo());
+	};
+
+	ko.applyBindings(viewModel);
+	    
+	load('forward','mandy');
+    };
+    </script>
+  </head>
+
+  <body>
+    <p>
+      <label>User:</label>
+      <input data-bind="value:user"></input>
+    </p>
+    <p>
+      <label>Repo:</label>
+      <input data-bind="value:repo"></input>
+    </p>
+    <p>
+      <input type='button' value='compute' data-bind='click:compute'></input>
+    </p>
+
+    <div id='graph-chart' style="text-align:center"></div>
+  </body>
+
+</html>

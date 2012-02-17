@@ -49,32 +49,6 @@ exports.parseTriples1 = function(test) {
 };
 
 
-/*
-exports.bgpExecution1 = function(test) {
-    mg.create(function(g) {
-	g.execute("INSERT DATA { <http://rdfstore-js.org/micrographql/graph#obj1> <name> \"John\"; <name> \"Juan\"; <age> \"26\"^^<http://www.w3.org/2001/XMLSchema#float> ; <friend> <http://rdfstore-js.org/micrographql/graph#obj2> .\
-                                 <http://rdfstore-js.org/micrographql/graph#obj2> <name> \"Mary\" ; <height> \"15\"^^<http://www.w3.org/2001/XMLSchema#float>.}",
-		  function(success, result) {
-		      var counter = 0;
-		      g.where({name: "John", friend:{}}).
-			  onError(function(reason) {
-			      test.done();
-			  }).
-			  each(function(result) {
-			      counter++;
-			      test.ok(result.name.length === 2);
-			      test.ok(result.age === 26);
-			  }).
-			  all(function(results) {
-			      test.ok(results.length === 1);
-			      test.ok(counter === 1);
-			      test.done();
-			  });
-		  });
-    });
-};
-*/
-
 exports.filters1 = function(test) {
     var data = {
 	$type: 'Person',
@@ -660,6 +634,44 @@ exports.inverseProperties = function(test) {
     });
 };
 
+exports.inverseProperties2 = function(test) {
+    mg.create(function(g) {
+	// saving a Person
+	g.save([{$type: 'Person',
+		 name: 'Ludwig',
+		 surname: 'Wittgenstein',
+		 birthplace: 'Wien'}], 	       
+	       function(lw){		   
+		   // saving some books
+		   g.save({$type: 'Book',
+			   title: 'The Open Society and its Enemies',
+			   // Popper is included as author here
+			   author: {$type: 'Person',
+				    name:'Karl',
+				    surname: 'Popper'},
+			   pages: 510}).
+		       save({$type: 'Book',
+			     title: 'Philosophical Investigations',
+			     pages: 320,
+			     author: lw}).
+		       save({$type: 'Book',
+			     title: 'Tractatus Logico-Philosophicus',
+			     pages: 120,
+			     author: lw}).
+		       // all books written by something whose name is not Wittgenstein
+		       where({$type: 'Person',
+			      surname: 'Wittgenstein',
+			      author$in: {}}).
+		       all(function(people){
+			   test.ok(people.length === 1);
+			   var lw = people[0];
+			   test.ok(lw.author$in.length === 2);
+			   test.done();
+		       });
+	       });
+    });
+};
+
 exports.remove1 = function(test) {
     mg.create(function(g) {
 	g.save([{$type: 'Person',
@@ -992,6 +1004,26 @@ exports.instantiate1 = function(test) {
 	    all().instances(function(phisicists){
 		test.ok(phisicists.length === 1);
 		test.ok(!phisicists[0].likesPhilosophy);
+		test.done();
+	    });
+    });
+};
+
+exports.tuples1 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	           name: 'Bertrand',
+	           surname: 'Russell'}]).
+	    load([{$type: 'Person',
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$type: g._t,
+		   name: 'Bertrand',
+		   surname: g._s}).
+	    tuples(function(results) {
+		test.ok(results.length == 1);
+		test.ok(results[0].t === 'Person');
+		test.ok(results[0].s === 'Russell');
 		test.done();
 	    });
     });

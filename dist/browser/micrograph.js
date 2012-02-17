@@ -9562,51 +9562,61 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 		isTopLevel = true;
 
 	    var id = idp.split(MicrographQL.base_uri)[1];
-	    if(processed[id] == null) {
-		var node = nodes[id];
-		node = node || {'$id': id};
-		nodes[id] = node;
-		
-		toIgnore = ignore[id] || {};
-		ignore[id] = toIgnore;
 
-		var invLinks = inverseMap[id] || inverseMap[p];
-		if(invLinks) {
-		    for(var linkedProp in invLinks) {
-			if(invLinks[linkedProp].length === 1) {
-			    var linkedObjId = results[i][varsMap[invLinks[linkedProp][0]]];
-			    if(linkedObjId != null) {
-				// this is a variable resolved to a URI in the bindings results
-				linkedObjId = linkedObjId.value.split(MicrographQL.base_uri)[1];
-			    } else {
-				linkedObjId = invLinks[linkedProp][0];
-			    }
+	    var node = nodes[id];
+	    node = node || {'$id': id};
+	    nodes[id] = node;
+
+	    var invLinks = inverseMap[id] || inverseMap[p];
+	    if(invLinks) {
+		for(var linkedProp in invLinks) {
+		    if(invLinks[linkedProp].length === 1) {
+			var linkedObjId = results[i][varsMap[invLinks[linkedProp][0]]];
+			if(linkedObjId != null) {
+			    // this is a variable resolved to a URI in the bindings results
+			    linkedObjId = linkedObjId.value.split(MicrographQL.base_uri)[1];
+			} else {
+			    linkedObjId = invLinks[linkedProp][0];
+			}
+
+			var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
+			var toIgnore = ignore[linkedObjId] || {};
+			ignore[linkedObjId] = toIgnore;
+			toIgnore[linkedProp] = true;
+			delete linkedNode[linkedProp];
+
+			nodes[linkedObjId] = linkedNode;
+			if(node[linkedProp+"$in"] == null) {
+			    node[linkedProp+"$in"] = linkedNode;
+			} else if(node[linkedProp+"$in"].constructor === Array) {
+			    node[linkedProp+"$in"].push(linkedNode);
+			} else {
+			    node[linkedProp+"$in"] = [node[linkedProp+"$in"], linkedNode];
+			}
+		    } else {
+			node[linkedProp+"$in"] = [];
+			for(var i=0; i< invLinks[linkedProp].length; i++) {
 
 			    var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
-			    var toIgnore = ignore[linkedObjId] || {};
+			    var toIgnore = ignore[linkedObjId] || {};					  
 			    ignore[linkedObjId] = toIgnore;
 			    toIgnore[linkedProp] = true;
 			    delete linkedNode[linkedProp];
 
-			    nodes[linkedObjId] = linkedNode;
-			    node[linkedProp+"$in"] = linkedNode;
-			} else {
-			    node[linkedProp+"$in"] = [];
-			    for(var i=0; i< invLinks[linkedProp].length; i++) {
-
-				var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
-				var toIgnore = ignore[linkedObjId] || {};					  
-				ignore[linkedObjId] = toIgnore;
-				toIgnore[linkedProp] = true;
-				delete linkedNode[linkedProp];
-
-				var linkedObjId = varsMap[invLinks[linkedProp][0]] || invLinks[linkedProp][0];
-				var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
-				nodes[linkedObjId].push(linkedNode);
-			    }
+			    var linkedObjId = varsMap[invLinks[linkedProp][0]] || invLinks[linkedProp][0];
+			    var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
+			    nodes[linkedObjId].push(linkedNode);
 			}
 		    }
 		}
+	    }
+
+
+
+	    if(processed[id] == null) {		
+		toIgnore = ignore[id] || {};
+		ignore[id] = toIgnore;
+
 
 		if(MicrographQL.isUri(idp)) {
 		    store.execute(MicrographQL.singleNodeQuery(idp, 'p', 'o'), function(success, resultsNode){
@@ -9783,7 +9793,7 @@ MicrographClass.check = function(resource) {
 	p = MicrographClass.definitionOrder[i];
         if(MicrographClass.isInstance(resource, p)) {
             if(isFirstRun || resource['__micrograph__classes'][p] == null) {
-                MicrographClass.instance(p,resource)
+                MicrographClass.instance(p,resource);
             }
             resource['__micrograph__classes'][p] = true;
         } else {
@@ -9969,6 +9979,22 @@ Micrograph.prototype.define = function(classExpression, object) {
 };
 
 Micrograph.prototype.instantiate = function(object) {
+    console.log(object.$id);
+    if(object['__micrograph__classes__'] != null) {
+	console.log("not recur");
+	return;
+    }
+    for(var p in object) {
+	if(typeof(object[p]) === 'object' && object[p].constructor != Date) {
+	    if(object[p].constructor == Array) {
+		for(var i=0; i<object[p].length; i++)
+		    if(typeof(object[p][i]) === 'object' && object[p][i].constructor != Date)
+			this.instantiate(object[p][i]);
+	    } else {
+		this.instantiate(object[p]);
+	    }
+	}
+    }
     MicrographClass.check(object);
     return this;
 };

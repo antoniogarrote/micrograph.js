@@ -27,7 +27,7 @@ MicrographQL.filterNames = {'$eq':true, '$lt':true, '$gt':true, '$neq':true, '$l
 
 MicrographQL.newContext = function(isQuery) {
     return {variables: [], isQuery:isQuery, quads:[], varsMap: {}, 
-	    filtersMap: {}, inverseMap:{}};
+	    filtersMap: {}, inverseMap:{}, nodes: true};
 };
 
 MicrographQL.isFilter = function(val) {
@@ -218,7 +218,8 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 	context.varsMap[nextVariable] = subject.value;
     } else {
 	subject = {'token':'var', 'value':nextVariable};
-	context.variables.push(subject);
+	if(context.nodes)
+	    context.variables.push(subject);
 	context.varsMap[nextVariable] = nextVariable;
     }
 
@@ -295,8 +296,12 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 			quads.push(quad);
 		    } else if(typeof(expression[p]) === 'object' && expression[p]['token'] === 'var') {
 			object = expression[p];
-			if(context.varsMap[expression] == null) {
+			if(context.varsMap[expression] == null && context.nodes) {
 			    context.varsMap[expression] = true;
+			    context.variables.push(object);
+			} else if(context.varsMap[object.value] == null && !context.nodes) {
+			    context.varsMap[expression] = true;
+			    context.varsMap[object.value] = true;
 			    context.variables.push(object);
 			}
 			var quad = {'subject':subject, 'predicate':predicate, 'object':object};
@@ -411,4 +416,12 @@ MicrographQL.literalToJS = function(object) {
 	object = object.value;
     }
     return object;
-}
+};
+
+MicrographQL.uriToJS = function(object) {
+    if(object.value.indexOf(MicrographQL.base_uri) != -1) {
+	return {'$id': object.value.split(MicrographQL.base_uri)[1] }
+    } else {
+	return {'$id': object.value }
+    }
+};

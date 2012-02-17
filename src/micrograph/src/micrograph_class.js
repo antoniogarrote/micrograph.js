@@ -52,7 +52,7 @@ MicrographClass.check = function(resource) {
 	p = MicrographClass.definitionOrder[i];
         if(MicrographClass.isInstance(resource, p)) {
             if(isFirstRun || resource['__micrograph__classes'][p] == null) {
-                MicrographClass.instance(p,resource)
+                MicrographClass.instance(p,resource);
             }
             resource['__micrograph__classes'][p] = true;
         } else {

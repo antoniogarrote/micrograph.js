@@ -9979,23 +9979,23 @@ Micrograph.prototype.define = function(classExpression, object) {
 };
 
 Micrograph.prototype.instantiate = function(object) {
-    console.log(object.$id);
-    if(object['__micrograph__classes__'] != null) {
-	console.log("not recur");
-	return;
+    if(object['__micrograph__classes'] != null) {
+	return this;
     }
+    
+    MicrographClass.check(object);
     for(var p in object) {
-	if(typeof(object[p]) === 'object' && object[p].constructor != Date) {
+	if(typeof(object[p]) === 'object' && object[p]!=null) {
 	    if(object[p].constructor == Array) {
 		for(var i=0; i<object[p].length; i++)
-		    if(typeof(object[p][i]) === 'object' && object[p][i].constructor != Date)
+		    if(typeof(object[p][i]) === 'object' && object[p][i].$id)
 			this.instantiate(object[p][i]);
 	    } else {
-		this.instantiate(object[p]);
+		if(object[p].$id)
+		    this.instantiate(object[p]);
 	    }
 	}
     }
-    MicrographClass.check(object);
     return this;
 };
 
