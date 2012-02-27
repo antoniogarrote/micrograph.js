@@ -84,7 +84,7 @@ MicrographClass.isInstance = function(resource, klass) {
         return false;
     } else if(klass.indexOf("prop(") === 0) {
         var propertyUri = klass.slice(0,klass.length-1).split("prop(")[1];
-        return resource[propertyUri] != null
+        return resource[propertyUri] != null;
     } else if(klass.indexOf("not(") === 0) {
         var expression = klass.slice(0,klass.length-1).split("not(")[1];
 	return !MicrographClass.isInstance(resource,expression);
@@ -97,7 +97,7 @@ MicrographClass.isInstance = function(resource, klass) {
 		}
 		return false;
 	    } else {
-		return resource['$type'] === klass
+		return resource['$type'] === klass;
 	    }
 	} else {
 	    return false;

@@ -39,6 +39,7 @@ exports.parseTriples1 = function(test) {
 		    test.ok(false);
 		}).
 		all(function(){
+
 		    test.ok(books["Tractatus Logico-Philosophicus"]);
 		    test.ok(books["Philosophical Investigations"]);
 		    test.ok(bookCounter == 2);
@@ -47,7 +48,6 @@ exports.parseTriples1 = function(test) {
 	});
     });
 };
-
 
 exports.filters1 = function(test) {
     var data = {
@@ -525,6 +525,7 @@ exports.limitOffset = function(test) {
     });
 };
 
+
 exports.saveTest = function(test) {
     var data = {
 	$type: 'Person',
@@ -583,16 +584,16 @@ exports.saveTest = function(test) {
 
 exports.inverseProperties = function(test) {
     mg.create(function(g) {
-	// saving a Person
+	//saving a Person
 	g.save([{$type: 'Person',
 		 name: 'Ludwig',
 		 surname: 'Wittgenstein',
 		 birthplace: 'Wien'}], 	       
 	       function(lw){		   
-		   // saving some books
+		   //saving some books
 		   g.save({$type: 'Book',
 			   title: 'The Open Society and its Enemies',
-			   // Popper is included as author here
+			   //Popper is included as author here
 			   author$in: {$type: 'Person',
 				       name:'Karl',
 				       surname: 'Popper'},
@@ -605,7 +606,7 @@ exports.inverseProperties = function(test) {
 			     title: 'Tractatus Logico-Philosophicus',
 			     pages: 120,
 			     author$in: lw.$id}).
-		       // all books written by something whose name is not Wittgenstein
+		       //all books written by something whose name is not Wittgenstein
 		       where({$type: 'Book',
 			      author$in: 
 			      {surname: {$neq: 'Wittgenstein'}}}).
@@ -617,7 +618,7 @@ exports.inverseProperties = function(test) {
 			   test.ok(titles["The Open Society and its Enemies"]);
 
 			   titles = {};
-			   // All books written by Wittgenstein
+			   //All books written by Wittgenstein
 			   g.where({surname: 'Wittgenstein',
 				    author: {}}).
 			       each(function(wittgenstein){
@@ -845,6 +846,85 @@ exports.update1 = function(test) {
     });
 };
 
+exports.update2 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	         name: 'Bertrand',
+	         surname: 'Russell'},
+		{$type: 'Person',
+	         name: 'Niels',
+		 surname: 'Bohr'}]).
+	    where({surname: 'Russell'}).
+	    first(function(russell) {
+		russell.name = 'Bertrando';
+		g.update(russell, function(res) {
+		    test.ok(res);
+		});
+	    }).
+	    where({surname: 'Russell'}).
+	    all(function(logicians){
+		test.ok(logicians.length === 1);
+		test.ok(logicians[0].name === 'Bertrando');
+		test.done();
+	    });
+    });
+};
+
+
+exports.update3 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	         name: 'Bertrand',
+	         surname: 'Russell'},
+		{$type: 'Person',
+	         name: 'Niels',
+		 surname: 'Bohr'}]).
+	    where({surname: 'Russell'}).
+	    first(function(russell) {
+		russell.name = 'Bertrando';
+		russell.country = {'name': 'Britain'}
+		g.update(russell, function(res) {
+		    test.ok(res);
+		});
+	    }).
+	    where({surname: 'Russell', country:{}}).
+	    all(function(logicians){
+		test.ok(logicians.length === 1);
+		test.ok(logicians[0].name === 'Bertrando');
+		test.ok(logicians[0].country.name === 'Britain');
+		test.done();
+	    });
+    });
+};
+
+exports.update4 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	         name: 'Bertrand',
+	         surname: 'Russell',
+		 livedIn:{name:'Great Britain', $type:'Country'}},
+		{$type: 'Person',
+	         name: 'Niels',
+		 surname: 'Bohr',
+		 livedIn:{name:'Denmark', $type: 'Country'}}]).
+	    where({surname: 'Russell', livedIn:{}}).
+	    first(function(russell) {
+		russell.name = 'Bertrando';
+		russell.livedIn = [russell.livedIn, {'name': 'United States', $type:'Country'}];
+		g.update(russell, function(res) {
+		    test.ok(res);
+		});
+	    }).
+	    where({surname: 'Russell', livedIn:{}}).
+	    all(function(logicians){
+		test.ok(logicians.length === 1);
+		test.ok(logicians[0].name === 'Bertrando');
+		test.ok(logicians[0].livedIn.length === 2);
+		test.done();
+	    });
+    });
+};
+
 exports.bind1 = function(test) {
     try{
 	var counter = 0;
@@ -1024,6 +1104,404 @@ exports.tuples1 = function(test) {
 		test.ok(results.length == 1);
 		test.ok(results[0].t === 'Person');
 		test.ok(results[0].s === 'Russell');
+		test.done();
+	    });
+    });
+};
+
+exports.tuples2 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	           name: 'Bertrand',
+	           surname: 'Russell'}]).
+	    load([{$type: 'Person',
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$id: g._x,
+		   name: 'Bertrand',
+		   surname: g._s}).
+	    tuples(function(results) {
+		test.ok(results.length === 1);
+		test.ok(results[0].x.$id.indexOf('object') == 0);
+		test.ok(results[0].s == 'Russell');
+		test.done();
+	    });
+    });
+};
+
+exports.tuples3 = function(test) {
+    mg.create(function(g) {
+	g.load([
+	    {$type: "Person",
+	     $id: "http://en.wikipedia.org/wiki/Bertrand_Russell",
+	     name: "Bertrand",
+	     surname: "Russell",
+	     born: {name: "United Kingdom",
+		    $type: "Country",
+		    $id: "http://en.wikipedia.org/wiki/United_Kingdom"},
+	     author: {title: "Principia Mathematica",
+		      $type: "Book",
+		      pages: 2300}},
+
+	    {$type: "Person",
+	     $id: "http://en.wikipedia.org/wiki/David_Hilbert",
+	     name: "David",
+	     surname: "Hilbert",
+	     born: {$id: "http://en.wikipedia.org/wiki/Germany"},
+	     author: {title: "Foundations of Geometry",
+		      $type: "Book",
+		      pages: 143}},
+
+	    {$type: "Person",
+	     $id: "http://en.wikipedia.org/wiki/Karl_Popper",
+	     name: "Karl",
+	     surname: "Popper",
+	     born: {$id: "http://en.wikipedia.org/wiki/Autria",
+		    name: "Austria",
+		    $type: "Country"},
+	     author: {title: "The Open society and Its Enemies",
+		      $type: "Book",
+		      pages: 471}},
+
+	    {$type: "Country",
+	     name: "Germany",
+	     $id: "http://en.wikipedia.org/wiki/Germany"},
+
+	    {$type: "Person",
+	     $id: "http://en.wikipedia.org/wiki/Niels_Bohr",
+	     name: "Niels",
+	     surname: "Bohr",
+	     born: {$id: "http://en.wikipedia.org/wiki/Denmark",
+		    $type: "Country",
+		    name: "Denmark"},
+	     nobelPrizeWinner: true}
+	]).
+	    where({$type: "Country",
+		   name: g._c,
+		   born$in:{surname: g._("surname"),
+			    author:{title: g._t}}}).
+	    tuples(function(results) {
+		test.ok(results.length === 3);
+		for(var i=0; i<results.length; i++) {
+		    var counter = 0;
+		    for(var p in results[i]) 
+			counter++;
+		    test.ok(counter === 3);
+		}
+		    
+		test.done();
+	    });
+    });
+};
+
+exports.states = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	           name: 'Bertrand',
+	           surname: 'Russell'}]).
+	    load([{$type: 'Person',
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$type: 'Person'}).
+	    all(function(people) {
+		for(var i=0; i<people.length; i++) {
+		    test.ok(people[i].$state === 'created');
+		}
+		test.done();
+	    });
+    });
+};
+
+exports.paths = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	         name: 'Bertrand',
+	         surname: 'Russell',
+		 book: {title: 'Principia Mathematica',
+		        pages: 2034}}]).
+	    load([{$type: 'Person',
+	           name: 'Jorge Luis',
+		   surname: 'Borges',
+		   book:{title: 'El Aleph',
+			 pages: 85}}]).
+	    where({$type: 'Person',
+		   "book/pages": 85}).
+	    all(function(people) {
+		//console.log(people);
+		test.done();
+	    });
+    });
+};
+
+try {
+    sys = require("util");
+} catch(e) {
+    sys = require("sys");
+}
+
+
+exports.paths1 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Node',
+		 name: 'a',
+	         parent:{$type: 'Node',
+			 name: 'b',
+			 parent: {$type: 'Node',
+				  name: 'c',
+				  parent: {$type: 'Node',
+					   name: 'd',
+					   parent: {$type: 'Node',
+						    name: 'e'}}}}},
+		{$type: 'Other', name: 'foo'}]).
+	    where({"parent*":{}}).
+	    all(function(nodes) {
+		//console.log(sys.inspect(nodes,true,20));
+		test.done();
+	    });
+    });
+};
+
+
+exports.paths2 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Node',
+		 name: 'a',
+	         parent:{$type: 'Node',
+			 name: 'b',
+			 parent: {$type: 'Node',
+				  name: 'c',
+				  parent: {$type: 'Node',
+					   name: 'd',
+					   parent: {$type: 'Node',
+						    name: 'e'}}}}},
+		{$type: 'Other', name: 'foo'}]).
+	    where({"parent*":{}}).
+	    all(function(nodes) {
+		//console.log(sys.inspect(nodes,true,20));
+		test.done();
+	    });
+    });
+};
+
+exports.paths3 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Node',
+		 name: 'a',
+	         parent:{$type: 'Node',
+			 name: 'b',
+			 parent: {$type: 'Node',
+				  name: 'c',
+				  parent: {$type: 'Node',
+					   name: 'd',
+					   parent: {$type: 'Node',
+						    name: 'e'}}}}},
+		{$type: 'Other', name: 'foo'}]).
+	    traverse("parent*/name").
+	    all(function(results) {
+		test.ok(results.length === 16);
+		var acum = {};
+		for(var i=0; i<results.length; i++) {
+		    //console.log(results[i].start.name+" -> "+results[i].end);
+		    var names = acum[results[i].start.name] || [];
+		    acum[results[i].start.name] = names;
+		    names.push(results[i].end);
+		}
+		test.ok(acum.e.length === 1);
+		test.ok(acum.d.length === 2);
+		test.ok(acum.c.length === 3);
+		test.ok(acum.b.length === 4);
+		test.ok(acum.a.length === 5);
+		test.ok(acum.foo.length === 1);
+		test.ok(acum.foo[0] === 'foo');
+		test.ok(acum.e[0] === 'e');
+		test.done();
+	    });
+    });
+};
+
+exports.paths4 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Node',
+		 name: 'a',
+	         parent:{$type: 'Node',
+			 name: 'b',
+			 parent: {$type: 'Node',
+				  name: 'c',
+				  parent: {$type: 'Node',
+					   name: 'd',
+					   parent: {$type: 'Node',
+						    name: 'e'}}}}},
+		{$type: 'Other', name: 'foo'}]).
+	    traverse("parent+/name").
+	    all(function(results) {
+		test.ok(results.length === 10);
+		var acum = {};
+		for(var i=0; i<results.length; i++) {
+		    //console.log(results[i].start.name+" -> "+results[i].end);
+		    var names = acum[results[i].start.name] || [];
+		    acum[results[i].start.name] = names;
+		    names.push(results[i].end);
+		}
+		test.ok(acum.d.length === 1);
+		test.ok(acum.c.length === 2);
+		test.ok(acum.b.length === 3);
+		test.ok(acum.a.length === 4);
+		test.done();
+	    });
+    });
+};
+
+exports.paths5 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Node',
+		 name: 'a',
+	         parent:{$type: 'Node',
+			 name: 'b',
+			 parent: {$type: 'Node',
+				  name: 'c',
+				  parent: {$type: 'Node',
+					   name: 'd',
+					   parent: {$type: 'Node',
+						    name: 'e'}}}}},
+		{$type: 'Other', name: 'foo'}]).
+	    traverse("parent/name").
+	    all(function(results) {
+		//console.log(results);
+		//test.ok(results.length === 10);
+		var acum = {};
+		for(var i=0; i<results.length; i++) {
+		    //console.log(results[i].start.name+" -> "+results[i].end);
+		    var names = acum[results[i].start.name] || [];
+		    acum[results[i].start.name] = names;
+		    names.push(results[i].end);
+		}
+		//console.log(acum);
+		//test.ok(acum.d.length === 1);
+		//test.ok(acum.c.length === 2);
+		//test.ok(acum.b.length === 3);
+		//test.ok(acum.a.length === 4);
+		test.done();
+	    });
+    });
+};
+
+exports.paths6 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Node',
+		 $id: 'anode',
+		 name: 'a',
+	         parent:{$type: 'Node',
+			 $id: 'bnode',
+			 name: 'b',
+			 parent: {$type: 'Node',
+				  $id: 'cnode',
+				  name: 'c',
+				  parent: {$type: 'Node',
+					   $id: 'dnode',
+					   name: 'd',
+					   parent: {$type: 'Node',
+						    $id: 'enode',
+						    name: 'e'}}}}},
+		{$type: 'Other', name: 'foo'}]).
+	    traverse("parent/parent/name").
+	    startNode({$id:'bnode',
+		       name: 'b'}).
+	    all(function(results) {
+		//console.log(results);
+		test.ok(results.length === 1);
+		var acum = {};
+		for(var i=0; i<results.length; i++) {
+		    //console.log(results[i].start.name+" -> "+results[i].end);
+		    var names = acum[results[i].start.name] || [];
+		    acum[results[i].start.name] = names;
+		    names.push(results[i].end);
+		}
+		test.ok(acum.b.length === 1);
+		test.ok(acum.b[0] === 'd');
+		test.done();
+	    });
+    });
+};
+
+exports.transformSpec = function(test) {
+    mg.create(function(g) {
+	g.transform({null: {'@delete':['meta']},
+		     data: {'@id': 'url',
+			    '@type': function(){ return 'Person'; },
+			    'surname': function(obj){ return "Mr. "+obj.surname; }
+			   }
+		    }).
+	    load({meta:{some: 'metadata'},
+		  data:[{name: 'Bertrand',
+			 surname: 'Russell',
+			 url: 'http://wikipedia.org/bertrand_russell'},
+			{name: 'Niels',
+			 surname: 'Bohr',
+			 url: 'http://wikipedia.org/niels_bohr'}]}).
+	    where({name: 'Bertrand'}).
+	    first(function(russell) {
+		test.ok(russell.surname === "Mr. Russell");
+	    }).
+	    where({}).
+	    all(function(nodes) {
+		// the meta node is not present (length===4)
+		test.ok(nodes.length === 3);
+		test.done();
+	    });
+    });
+};
+
+exports.nilTest1 = function(test) {
+    var data = [{ $type: 'Person',
+		  $id: 'lw',
+		  name: 'Ludwig',
+		  surname: 'Wittgenstein',
+		  birthplace: 'Wien',
+		  age: null
+		},
+		{ $type: 'Person',
+		  $id: 'rms',
+		  name: 'Richard',
+		  surname: 'Stallman',
+		  birthplace: 'NYC',
+		  age: 58
+		}]
+
+    mg.create(function(g) {
+	g.load(data,function(){
+	    g.where({$type: 'Person'}).
+		all(function(res){
+		    test.ok(res[0].age === null);
+
+		}).
+		where({age: null}).
+		all(function(res) {
+		    test.ok(res[0].surname === 'Wittgenstein');
+		    g.load({$id: 'lw',
+			    age: 125}).
+			where({$id: 'lw'}).
+			first(function(lw) {
+			    test.ok(lw.age === 125)
+			    test.done();
+			});
+		})
+	});
+    });
+};
+
+exports.testGroupBy = function(test) {
+    mg.create(function(g) {
+	g.load([{a:1, b:2},
+	        {a:1, b:3},
+	        {a:2, b:4},
+	        {a:3, b:5},
+	        {a:3, b:6}]).
+	    where({}).
+	    groupBy('a').
+	    all(function(groups){
+		test.ok(groups['1'].length === 2);
+		test.ok(groups['2'].length === 1);
+		test.ok(groups['3'].length === 2);
 		test.done();
 	    });
     });

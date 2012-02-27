@@ -50,7 +50,7 @@ this.micrograph_suite.parseTriples1 = function(test) {
 
 this.micrograph_suite.testJSONP = function(test) {
     mg.create(function(g) {
-	g.from("https://api.github.com/repos/clojure/clojure/commits?callback=loadCommits").
+	g.from("https://api.github.com/repos/clojure/clojure/commits?callback=loadCommits3").
 	    onError(function(e){
 		test.ok(false);
 		test.done();
@@ -91,6 +91,66 @@ this.micrograph_suite.testJSONP = function(test) {
 			test.ok(commit.parents.parents.committer.login != null);
 		    }).
 		    all(function(commits) {
+			test.done();
+		    });
+	    });
+    });
+};
+
+this.micrograph_suite.testJSONP2 = function(test) {
+    mg.create(function(g) {
+	g.from(["https://api.github.com/repos/clojure/clojure/commits",
+		"https://api.github.com/repos/clojure/clojure"],
+	       {jsonp:'callback'}).
+	    onError(function(e){
+		test.ok(false);
+		test.done();
+	    }).
+	    transform(function(prop,obj, from) {
+		if(prop == null) {
+		    delete obj.meta;
+		} else if(prop === 'data') {
+		    if(from === "https://api.github.com/repos/clojure/clojure/commits") {
+			obj.$id = obj.url;
+			obj.$type = 'Commit';
+			obj.message = obj.commit.message;
+			obj.tree = obj.commit.tree;
+			if(obj.author && obj.commit.author) {
+          		    obj.author.email = obj.commit.author.email;
+			    obj.author.name = obj.commit.author.name;
+			}
+			obj.date = new Date(obj.commit.author.date);
+			delete obj.commit;
+		    } else {
+			obj.$id = obj.homepage;
+			obj.$type = "Repo"
+		    }
+		} else if(prop === 'committer' || prop === 'author') {
+		    obj.$id = obj.url;
+		    obj.$type = 'Person';
+		} else if(prop === 'parents' || prop === 'tree') {
+		    obj.$id = obj.url;
+		    delete obj.url;
+		    delete obj.sha;
+		}
+	    }).
+	    load(function() {
+		g.where({$type: 'Commit', 
+			 parents:{
+			     parents:{ committer: {} }, 
+			     committer:{}
+			 }}).
+		    each(function(commit){
+			test.ok(commit.parents != null);
+			test.ok(commit.parents.committer.login != null);
+			test.ok(commit.parents.parents != null);
+			test.ok(commit.parents.parents.committer.login != null);
+		    }).
+		    all().
+		    where({$type: 'Repo'}).
+		    all(function(repos) {
+			test.ok(repos!=null);
+			test.ok(repos.length === 1);
 			test.done();
 		    });
 	    });
@@ -567,7 +627,7 @@ this.micrograph_suite.filters9 = function(test) {
     });
 };
 
-
+/*
 this.micrograph_suite.limitOffset = function(test) {
     var data = [{a: 1},
 		{a: 3},
@@ -600,6 +660,7 @@ this.micrograph_suite.limitOffset = function(test) {
 	});
     });
 };
+*/
 
 this.micrograph_suite.saveTest = function(test) {
     var data = {
@@ -883,7 +944,7 @@ this.micrograph_suite.update1 = function(test) {
     });
 }
 
-
+/*
 this.micrograph_suite.bind1 = function(test) {
     try{
 	var counter = 0;
@@ -988,6 +1049,7 @@ this.micrograph_suite.bind2b = function(test) {
 	test.done();
     }
 };
+*/
 
 this.micrograph_suite.instantiate1 = function(test) {
     mg.create(function(g) {
@@ -1047,3 +1109,143 @@ this.micrograph_suite.instantiate1 = function(test) {
 	    });
     });
 };
+
+this.micrograph_suite.tuples1 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	           name: 'Bertrand',
+	           surname: 'Russell'}]).
+	    load([{$type: 'Person',
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$type: g._t,
+		   name: 'Bertrand',
+		   surname: g._s}).
+	    tuples(function(results) {
+		test.ok(results.length == 1);
+		test.ok(results[0].t === 'Person');
+		test.ok(results[0].s === 'Russell');
+		test.done();
+	    });
+    });
+};
+
+this.micrograph_suite.tuples2 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	           name: 'Bertrand',
+	           surname: 'Russell'}]).
+	    load([{$type: 'Person',
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$id: g._x,
+		   name: 'Bertrand',
+		   surname: g._s}).
+	    tuples(function(results) {
+		test.ok(results.length === 1);
+		test.ok(results[0].x.$id.indexOf('object') == 0);
+		test.ok(results[0].s == 'Russell');
+		test.done();
+	    });
+    });
+};
+
+this.micrograph_suite.states = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	           name: 'Bertrand',
+	           surname: 'Russell'}]).
+	    load([{$type: 'Person',
+	           name: 'Niels',
+		   surname: 'Bohr'}]).
+	    where({$type: 'Person'}).
+	    all(function(people) {
+		for(var i=0; i<people.length; i++) {
+		    test.ok(people[i].$state === 'created');
+		}
+		test.done();
+	    });
+    });
+};
+
+this.micrograph_suite.states2 = function(test) {
+    mg.create(function(g) {
+	g.from("https://api.github.com/repos/rails/rails/commits?callback=loadCommits&per_page=100").
+	    transform(function(prop,obj) {
+		if(prop == null) {
+		    delete obj.meta;
+		} else if(prop === 'data') {
+		    obj.$id = obj.url;
+		    obj.$type = 'Commit';
+		    obj.message = obj.commit.message;
+		    obj.tree = obj.commit.tree;
+		    if(obj.author && obj.commit.author) {
+          		obj.author.email = obj.commit.author.email;
+			obj.author.name = obj.commit.author.name;
+		    }
+		    obj.date = obj.commit.author.date;
+		    delete obj.commit;
+		} else if(prop === 'committer' || prop === 'author') {
+		    obj.$id = obj.url;
+		    obj.$type = 'Person';
+		} else if(prop === 'parents' || prop === 'tree') {
+		    obj.$id = obj.url;
+		    obj.$type = 'Commit';
+		    delete obj.url;
+		    delete obj.sha;
+		}
+	    }).
+	    load(function() {
+		g.where({$type:'Commit'}).
+		    all(function(commits) {
+			for(var i=0; i<commits.length; i++) {
+			    test.ok(commits[i].$state === 'loaded');
+			    commits[i].modified = true;
+			    g.update(commits[i]);
+			}
+		    }).
+		    where({$type:'Commit'}).
+		    all(function(commits) {
+			for(var i=0; i<commits.length; i++) {
+			    test.ok(commits[i].$state === 'dirty');
+			    test.ok(commits[i].modified === true);
+			}
+			test.done();
+		    });
+	    });
+    });
+};
+/*
+this.micrograph_suite.sync1 = function(test) {
+    mg.create(function(g) {
+	mg.ajax('GET','/reset',null, function() {
+	    g.define("Philosopher", {'isPhilosopher': function(){ return true; }})
+		.resource({$type: 'Philosopher',
+			   baseURL: '/philosophers',
+			   transform: function(obj){ return obj }});
+	    g.load({$type:'Philosopher',
+		    type: 'Philosopher',
+		    name: 'John',
+		    surname: 'Stuart Mill'})
+		.where({$type: 'Philosopher'})
+		.all(function(philosophers) {
+		    console.log(philosophers);
+		    test.ok(philosophers.length === 1);
+		})
+		.sync(function(res) {
+		    debugger;
+		    console.log(res);
+		})
+		.where({$type: 'Philosopher'})
+		.all(function(philosophers){
+		    debugger;
+		    console.log(philosophers);
+		    test.done();
+		})};
+	},function() {
+	    test.ok(false);
+	    test.done();
+	});
+    });  
+};
+*/

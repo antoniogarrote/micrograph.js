@@ -69,18 +69,28 @@ Utils.remove = function(a,v) {
 
 Utils.repeat = function(c,max,floop,fend,env) {
     if(arguments.length===4) { env = {}; }
+    for(var i=c; i<max; i++) {
+	env._i=i;
+	floop(function(k,env) {
+
+	}, env);
+    }
+    fend(env);
+};
+
+Utils.repeatAsync = function(c,max,floop,fend,env) {
+    if(arguments.length===4) { env = {}; }
     if(c<max) {
         env._i = c;
         floop(function(floop,env){
             // avoid stack overflow
             // deadly hack
-            Utils.recur(function(){ Utils.repeat(c+1, max, floop, fend, env); });
+            Utils.recur(function(){ Utils.repeatAsync(c+1, max, floop, fend, env); });
         },env);
     } else {
         fend(env);
     }
 };
-
 
 Utils.meanwhile = function(c,floop,fend,env) {
     if(arguments.length===3) { env = {}; }
@@ -147,15 +157,7 @@ Utils.keys = function(obj) {
 };
 
 Utils.iso8601 = function(date) {
-    function pad(n){
-        return n<10 ? '0'+n : n;
-    }    
-    return date.getUTCFullYear()+'-'
-        + pad(date.getUTCMonth()+1)+'-'
-        + pad(date.getUTCDate())+'T'
-        + pad(date.getUTCHours())+':'
-        + pad(date.getUTCMinutes())+':'
-        + pad(date.getUTCSeconds())+'Z';
+    return date.getTime();
 };
 
 
@@ -210,30 +212,8 @@ Utils.parseStrictISO8601 = function (str) {
 
 
 Utils.parseISO8601 = function (str) {
-    var regexp = "([0-9]{4})(-([0-9]{2})(-([0-9]{2})" +
-        "(T([0-9]{2}):([0-9]{2})(:([0-9]{2})(\.([0-9]+))?)?" +
-        "(Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?";
-    var d = str.match(new RegExp(regexp));
+    return new Date(parseInt(str));
 
-    var offset = 0;
-    var date = new Date(d[1], 0, 1);
-
-    if (d[3]) { date.setMonth(d[3] - 1); }
-    if (d[5]) { date.setDate(d[5]);  }
-    if (d[7]) { date.setHours(d[7]);  }
-    if (d[8]) { date.setMinutes(d[8]);  }
-    if (d[10]) { date.setSeconds(d[10]);  }
-    if (d[12]) { date.setMilliseconds(Number("0." + d[12]) * 1000); }
-    if (d[14]) {
-        offset = (Number(d[16]) * 60) + Number(d[17]);
-        offset *= ((d[15] == '-') ? 1 : -1);
-    }
-
-    offset -= date.getTimezoneOffset();
-    var time = (Number(date) + (offset * 60 * 1000));
-    var toReturn = new Date();
-    toReturn.setTime(Number(time));
-    return toReturn;
 };
 
 Utils.parseISO8601Components = function (str) {
@@ -273,51 +253,7 @@ Utils.parseISO8601Components = function (str) {
 };
 
 Utils.compareDateComponents = function(stra,strb) {
-    var a = Utils.parseISO8601Components(stra);
-    var b = Utils.parseISO8601Components(strb);
-
-    if((a.timezone == null && b.timezone == null) ||
-       (a.timezone != null && b.timezone != null)) {        
-        var da = Utils.parseISO8601(stra);
-        var db = Utils.parseISO8601(strb);
-        
-        if(da.getTime() == db.getTime()) {
-            return 0;
-        } else if(da.getTime() < db.getTime()){
-            return -1;
-        } else {
-            return 1;
-        }
-    } else if (a.timezone != null && b.timezone == null){
-        da = Utils.parseISO8601(stra);
-        db = Utils.parseISO8601(strb);
-        var ta = da.getTime();
-        var tb = db.getTime();
-
-        var offset = 14*60*60;
-
-        if(ta < tb && ta < (tb + offset)) {
-            return -1;
-        } else if(ta > tb && ta > (tb - offset)) {
-            return 1;
-        } else {
-        return null;
-        }
-    } else {
-        da = Utils.parseISO8601(stra);
-        db = Utils.parseISO8601(strb);
-        ta = da.getTime();
-        tb = db.getTime();
-
-        var offset = 14*60*60;
-        if(ta < tb && (ta + offset)  < tb) {
-            return -1;
-        } else if(ta > tb && (ta + offset) > tb) {
-            return 1;
-        } else {
-        return null;
-        }
-    }
+    return stra == strb;
 };
 
 // RDF utils
@@ -5091,7 +5027,7 @@ QueryFilters.effectiveTypeValue = function(val){
             // plain literal -> just manipulate the string
             return val.value;
         } else {
-            return val.value
+            return val.value;
         }
     } else {
         // @todo
@@ -5200,7 +5136,7 @@ QueryFilters.runEqualityFunction = function(op1, op2, bindings, queryEngine, dat
             return QueryFilters.ebvFalse();
         }
 
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
+        var comp = op1.value == op2.value;
         if(comp != null) {
             if(comp == 0) {
                 return QueryFilters.ebvTrue();
@@ -5765,7 +5701,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
     } else {
         var ops = [];
         for(var i=0; i<args.length; i++) {
-            ops.push(QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env))
+            ops.push(QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env));
         }
 
         var fun = Utils.lexicalFormBaseUri(iriref, env);
@@ -5937,12 +5873,12 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }            
         } else if(fun == "http://www.w3.org/2001/XMLSchema#dateTime" || fun == "http://www.w3.org/2001/XMLSchema#date") { 
-            from = ops[0];
+            var from = ops[0];
             if(from.type == "http://www.w3.org/2001/XMLSchema#dateTime" || from.type == "http://www.w3.org/2001/XMLSchema#date") {
                 return from;
             } else if(from.type == "http://www.w3.org/2001/XMLSchema#string" || from.type == null) {
                 try {
-                    from.value = Utils.iso8601(Utils.parseStrictISO8601(from.value));
+                    from.value = Utils.iso8601(from.value);
                     from.type = fun;
                     return from;
                 } catch(e) {
@@ -7483,6 +7419,8 @@ QueryEngine.QueryEngine.prototype.groupSolution = function(bindings, group, data
 QueryEngine.QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern, env) {
     if(pattern.kind === "BGP") {
         return this.executeAndBGP(projection, dataset, pattern, env);
+    } else if(pattern.kind === "UNION") {
+        return this.executeUNION(projection, dataset, pattern.value, env);            
     } else if(pattern.kind === "JOIN") {
         return this.executeJOIN(projection, dataset, pattern, env);            
     } else if(pattern.kind === "LEFT_JOIN") {
@@ -7629,6 +7567,34 @@ QueryEngine.QueryEngine.prototype.executeZeroOrMorePath = function(pattern, data
     } else {
 	throw "Kind of path not supported!";
     }
+};
+
+QueryEngine.QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env) {
+    var setQuery1 = patterns[0];
+    var setQuery2 = patterns[1];
+    var set1 = null;
+    var set2 = null;
+
+    if(patterns.length != 2) {
+        throw("SPARQL algebra UNION with more than two components");
+    }
+
+    var that = this;
+    var sets = [];
+
+    set1 = that.executeSelectUnit(projection, dataset, setQuery1, env);
+    if(set1==null) {
+        return null;
+    }
+
+    set2 = that.executeSelectUnit(projection, dataset, setQuery2, env);
+    if(set2==null) {
+        return null;
+    }
+
+    var result = QueryPlan.unionBindings(set1, set2);
+    result = QueryFilters.checkFilters(patterns, result, false, dataset, env, that);
+    return result;
 };
 
 QueryEngine.QueryEngine.prototype.executeAndBGP = function(projection, dataset, patterns, env) {
@@ -8734,18 +8700,19 @@ Utils.normalizeUnicodeLiterals = function(toNormalize) {
 // QL
 MicrographQL.base_uri = "http://rdfstore-js.org/micrographql/graph#";
 MicrographQL.prefix = "mql";
+MicrographQL.NIL = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil"
 
 MicrographQL.counter = 0;
 
 MicrographQL.filterNames = {'$eq':true, '$lt':true, '$gt':true, '$neq':true, '$lteq':true, '$gteq':true, '$not':true, '$like':true, '$and':true, '$or':true};
 
 MicrographQL.newContext = function(isQuery) {
-    return {variables: [], isQuery:isQuery, quads:[], varsMap: {}, 
-	    filtersMap: {}, inverseMap:{}};
+    return {variables: [], isQuery:isQuery, quads:[], varsMap: {},   
+	    filtersMap: {}, inverseMap:{}, nodes: true, optionals: []};
 };
 
 MicrographQL.isFilter = function(val) {
-    if(typeof(val) !== 'object' || val.constructor === Array) {
+    if(val===null || typeof(val) !== 'object' || val.constructor === Array) {
 	return false;
     } else {
 	for(var p in val) {
@@ -8840,7 +8807,7 @@ MicrographQL.parseFilter = function(predicate, filterVariable, expression) {
 	    return {
                 "token": "expression",
                 "expressionType": "irireforfunction",
-                "iriref": MicrographQL.parseURI(MicrographQL.base_uri+expression['$id'])
+                "iriref": MicrographQL.parseURI((MicrographQL.isUri(expression['$id']) ? expression['$id'] : MicrographQL.base_uri+expression['$id']))
 	    };
 	} else {
 	    var literal =  MicrographQL.parseLiteral(expression);
@@ -8865,7 +8832,7 @@ MicrographQL.parseFilter = function(predicate, filterVariable, expression) {
 };
 
 MicrographQL.nextVariable = function() {
-    var variable = "id"+MicrographQL.counter;
+    var variable = "id__mg__"+MicrographQL.counter;
     MicrographQL.counter++;
     return variable;
 };
@@ -8887,8 +8854,39 @@ MicrographQL.parseURI = function(value) {
     }
 };
 
+MicrographQL.parsePath = function(value) {
+    var pathParts = value.split("/");
+    var values = [], token, modifier, pathComponent;
+    for(var i=0; i<pathParts.length; i++) {
+	value = pathParts[i];
+	modifier = null;
+	if(value.indexOf("*") === value.length-1) {
+	    modifier = "*";
+	    value = value.substring(0,value.length-1);
+	} else if(value.indexOf("?") === value.length-1) {
+	    modifier = "?";
+	    value = value.substring(0,value.length-1);
+	} else if(value.indexOf("+") === value.length-1) {
+	    modifier = "+";
+	    value = value.substring(0,value.length-1);
+	}
+
+	token = MicrographQL.parseURI(value);
+	if(modifier != null)
+	    token = {'token':'path', 'kind':'element', 'value':token, 'modifier': modifier};
+
+	values.push(token);
+    }
+
+    return {"token": "path",
+            "kind": "sequence",
+	    "value": values};
+};
+
 MicrographQL.parseLiteral = function(value) {
-    if(typeof(value) === 'string') {
+    if(value === null) {
+	return {'token': 'uri', 'value': MicrographQL.NIL};
+    } else if(typeof(value) === 'string') {
 	return {'token': 'literal', 'value': value, 'lang':null, 'type':null };
     } else if(typeof(value) === 'boolean') {
 	return {'token': 'literal', 'value': ""+value, 'type':'http://www.w3.org/2001/XMLSchema#boolean', 'lang':null};
@@ -8901,15 +8899,15 @@ MicrographQL.parseLiteral = function(value) {
     }
 };
 
-MicrographQL.parseJSON = function(object, graph) {
+MicrographQL.parseJSON = function(object, graph, from, state) {
     var context = MicrographQL.newContext(false);
-    var result = MicrographQL.parseBGP(object, context, true, graph);
+    var result = MicrographQL.parseBGP(object, context, true, graph, from, state);
     var quads = context.quads.concat(result[1]);
     return quads;
 };
 
 
-MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
+MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, state) {
     var subject = null;
     var quads = [];
     var nextVariable = MicrographQL.nextVariable();
@@ -8919,20 +8917,43 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 	    subject = MicrographQL.parseURI(null); // generates URI with next ID
 	    if(expression['$id'] == null) 
 		expression['$id'] = "object"+(MicrographQL.counter-1); // the previous ID
-
 	} else {
 	    if(expression['$id']['token'] ==='var') {
-		// this node is an inverse relationship
+		// this node might be an inverse relationship
+		// or can be set to a var by a tuple or path query
 		subject = expression['$id'];
+		if(!context.nodes && subject.value.indexOf("id__mg__") == -1) // this is a dirty fix, how to tell if the var is generated or provided?
+		    context.variables.push(subject);
 	    } else {
-		subject = MicrographQL.parseURI(MicrographQL.base_uri+expression['$id']);
+		if(MicrographQL.isUri(expression['$id']))
+		    subject = MicrographQL.parseURI(expression['$id']);
+  	        else
+		    subject = MicrographQL.parseURI(MicrographQL.base_uri+expression['$id']);
+	    }
+
+	    if(context.isQuery && subject.token !== 'var') {
+		var filterVariable = nextVariable;
+		var variableToken = {'token':'var', 'value': filterVariable};
+		var filterString = MicrographQL.parseFilter(predicate,variableToken, {$eq: {'$id': expression['$id']}});
+		context.variables.push(variableToken);
+		context.varsMap[filterVariable] = nextVariable;
+		context.filtersMap[filterVariable] = filterString;
+		subject = variableToken;
 	    }
 	}
+
+	if(expression['$from'] == null && from != null)
+	    expression['$from'] = from;
+	if(expression['$state'] == null && state != null)
+	    expression['$state'] = state;
+	else if(expression['$state'] === 'loaded' && state === 'dirty') 
+	    expression['$state'] = 'dirty';
 
 	context.varsMap[nextVariable] = subject.value;
     } else {
 	subject = {'token':'var', 'value':nextVariable};
-	context.variables.push(subject);
+	if(context.nodes)
+	    context.variables.push(subject);
 	context.varsMap[nextVariable] = nextVariable;
     }
 
@@ -8943,20 +8964,20 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
     
     var predicate, object, result, linked, linkedId, inverseLinks, linkedProp, detectEmpty = true;
     for(var p in expression) {
-	if(expression[p] != null) {
+	if(expression[p] !== undefined) {
 	    if(p!=='$id') {
 		detectEmpty = false;
 		if(p.indexOf("$in") == (p.length-3) && p.indexOf("$in") !== -1) {
-
+				 
 		    // rewrite inverse properties
 		    linked = expression[p];
 		    linkedProp = p.split("$in")[0];
-
+				 
 		    // this could also be $this eventually
 		    if(typeof(expression[p]) === "string")
 			linked = {'$id': expression[p]};
 		    expression[p] = linked;
-
+				 
 		    var idInverseMap, invLinkedId;
 		    if(subject.token === 'uri') {
 			invLinkedId = expression['$id'];
@@ -8968,12 +8989,13 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 		    }
 
 		    linked[linkedProp] = {'$id':invLinkedId};
-		    result = MicrographQL.parseBGP(linked, context, false, graph);
+
+		    result = MicrographQL.parseBGP(linked, context, false, graph, from, state);
 
 		    inverseLinks = context.inverseMap[idInverseMap] || {};
 		    context.inverseMap[idInverseMap] = inverseLinks;
 
-		    var linked = inverseLinks[linkedProp] || [];
+		    linked = inverseLinks[linkedProp] || [];
 		    inverseLinks[linkedProp] = linked;
 		    if(result[0].token === 'uri') {
 			linked.push(result[0].value.split(MicrographQL.base_uri)[1]);
@@ -8983,16 +9005,38 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 
 		    context.quads = context.quads.concat(result[1]);
 		} else {
-
+		    
 		    var predicateUri = p;
-		    if(p === '$type') {
-			predicateUri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+		    var isOptional = false;
+
+		    if(p.indexOf("$opt") ===  p.length-4) {
+			isOptional = true;
+			p = p.split("$opt")[0];
 		    }
 
-		    predicate = MicrographQL.parseURI(predicateUri);
+		    if(p === '$type')
+			predicateUri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+
+		    if(p === '$from')
+			predicateUri = MicrographQL.base_uri+"from";
+
+		    if(p === '$state')
+			predicateUri = MicrographQL.base_uri+"state";
+
+		    if(p.indexOf("/")!=-1 || 
+		       p.indexOf("*") === p.length-1 || 
+		       p.indexOf("?") === p.length-1 ||
+		       p.indexOf("+") === p.length-1) {
+			predicate = MicrographQL.parsePath(predicateUri);				
+		    } else if(p.indexOf("$path") != -1) {
+			predicate = MicrographQL.parsePath(predicateUri.split("$path")[0]);				
+		    } else {
+			predicate = MicrographQL.parseURI(predicateUri);	
+		    }
 
 		    // check if the object is a filter
 		    var isFilter = MicrographQL.isFilter(expression[p]);
+
 
 		    // process the object
 		    if(isFilter) {
@@ -9007,10 +9051,14 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 			if(graph != null)
 			    quad['graph'] = graph;
 			quads.push(quad);
-		    } else if(typeof(expression[p]) === 'object' && expression[p]['token'] === 'var') {
+		    } else if(expression[p] !== null && typeof(expression[p]) === 'object' && expression[p]['token'] === 'var') {
 			object = expression[p];
-			if(context.varsMap[expression] == null) {
+			if(context.varsMap[expression] == null && context.nodes) {
 			    context.varsMap[expression] = true;
+			    context.variables.push(object);
+			} else if(context.varsMap[object.value] == null && !context.nodes) {
+			    context.varsMap[expression] = true;
+			    context.varsMap[object.value] = true;
 			    context.variables.push(object);
 			}
 			var quad = {'subject':subject, 'predicate':predicate, 'object':object};
@@ -9019,6 +9067,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 			quads.push(quad);
 
 		    } else if(typeof(expression[p]) === 'string' || 
+			      expression[p] === null ||
 			      (typeof(expression[p]) === 'object' && expression[p].constructor === Date) || 
 			      typeof(expression[p]) === 'number' ||
 			      typeof(expression[p]) === 'boolean') {
@@ -9031,7 +9080,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 			if(expression[p].constructor == Array) {
 			    for(var i=0; i<expression[p].length; i++) {
 				if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
-				    result = MicrographQL.parseBGP(expression[p][i], context, false, graph);
+				    result = MicrographQL.parseBGP(expression[p][i], context, false, graph, from, state);
 				    object = result[0];
 				    context.quads = context.quads.concat(result[1]);
 				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
@@ -9053,7 +9102,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 				    quad['graph'] = graph;
 				quads.push(quad);
 			    } else {
-				result = MicrographQL.parseBGP(expression[p], context, false, graph);
+				result = MicrographQL.parseBGP(expression[p], context, false, graph, from, state);
 				object = result[0];
 				context.quads = context.quads.concat(result[1]);
 				var quad = {'subject':subject, 'predicate':predicate, 'object':object};
@@ -9125,7 +9174,15 @@ MicrographQL.literalToJS = function(object) {
 	object = object.value;
     }
     return object;
-}
+};
+
+MicrographQL.uriToJS = function(object) {
+    if(object.value.indexOf(MicrographQL.base_uri) != -1) {
+	return {'$id': object.value.split(MicrographQL.base_uri)[1] }
+    } else {
+	return {'$id': object.value }
+    }
+};
 // end of ./src/micrograph/src/micrograph_ql.js 
 // imports
 
@@ -9142,7 +9199,10 @@ try {
 var MicrographQuery = function(template) {
     this.template = template;
     this.lastResult = null;
-    this.filter = null;
+    this.filter = [];
+    this.groupPredicate = null;
+    this.startNodePath = null;
+    this.endNodePath = null;
 };
 
 MicrographQuery.prototype.setKind = function(kind) {
@@ -9161,7 +9221,22 @@ MicrographQuery.prototype.setCallback = function(callback) {
 };
 
 MicrographQuery.prototype.each = function(callback) {
-    this.filter = callback;
+    this.filter.push(['each',callback]);
+    return this;
+};
+
+MicrographQuery.prototype.map = function(callback) {
+    this.filter.push(['map',callback]);
+    return this;
+};
+
+MicrographQuery.prototype.reduce = function(acum,callback) {
+    this.filter.push(['reduce',acum, callback]);
+    return this;
+};
+
+MicrographQuery.prototype.select = function(callback) {
+    this.filter.push(['select',callback]);
     return this;
 };
 
@@ -9180,13 +9255,39 @@ MicrographQuery.prototype.offset = function(offset) {
     return this;
 };
 
+MicrographQuery.prototype.groupBy = function(groupPredicate) {
+    this.groupPredicate = (typeof(groupPredicate) === 'string' ? function(obj){ return obj[groupPredicate]; } : groupPredicate );
+    return this;
+};
+
 MicrographQuery.prototype.order = function(order) {
     this.sortValue = order;
     return this;
 }
 
+MicrographQuery.prototype.startNode = function(node) {
+    this.template['$id'] = node['$id'];
+    this.startNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']))
+    return this;
+};
+
+MicrographQuery.prototype.endNode = function(node) {
+    this.endNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']))
+    for(var p in this.template) {
+	if(p != '$id') {
+	    this.template[p] = {'$id':node['$id']};
+	    break;
+	}
+    }
+    return this;
+};
+
+
 MicrographQuery.prototype.all = function(callback) {
-    this.kind = 'all';
+    if(this.kind === 'traverse')
+	this.kind = 'traverseAll';
+    else
+	this.kind = 'all';
     var that = this;
     this._executeQuery(function(result){
 	that.lastResult = result;
@@ -9210,6 +9311,37 @@ MicrographQuery.prototype.first = function(callback) {
 	}
     });
 
+    return this.store;
+};
+
+MicrographQuery.prototype.tuples = function(callback) {
+    this.kind = 'tuples';
+    var that = this;
+    this._executeQuery(function(results){
+	if(results) {
+	    for(var i=0; i<results.length; i++) {
+		var result = results[i];
+		for(var p in result) {
+		    if(result[p].token === 'literal') {
+			result[p] = MicrographQL.literalToJS(result[p]);
+		    } else {
+			result[p] = MicrographQL.uriToJS(result[p]);
+		    }
+		}
+	    }
+	    
+	    if(that.filter.length > 0) {
+		that._applyResultFilter(results, callback);
+	    } else {	
+		if(that.groupPredicate != null) 
+		    that._groupResults(results, callback);
+		else
+		    callback(results);
+	    }
+	} else {
+	    callback(results);
+	}
+    });
     return this.store;
 };
 
@@ -9248,7 +9380,6 @@ MicrographQuery.prototype._executeUpdate = function(callback) {
     this.topLevel = pattern.topLevel;
     this.subject = pattern.subject;
     this.inverseMap = pattern.inverseMap;
-    //console.log(sys.inspect(this.query, true, 20));
     this.store.execute(this.query,function(success, results){
 	if(callback)
 	    callback(success);
@@ -9257,6 +9388,7 @@ MicrographQuery.prototype._executeUpdate = function(callback) {
 
 MicrographQuery.prototype._executeQuery = function(callback) {
     var pattern = this._parseQuery(this.template);
+    var that = this;
 
     this.query = pattern.query;
     this.varsMap = pattern.varsMap;
@@ -9267,6 +9399,7 @@ MicrographQuery.prototype._executeQuery = function(callback) {
     // Final processing of query
     var quads = this.query.units[0].pattern.patterns[0].triplesContext;
     var unit = this.query.units[0];
+
     // sort by
     var  sortAcum = [];
     if(this.sortValue) {
@@ -9287,9 +9420,13 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 	    }
 	    
 	    var predicate, object;
-	    if(sortPredicate === '$type') {
+	    if(sortPredicate === '$type')
 		predicate = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-	    }
+	    if(sortPredicate === '$from')
+		predicate = MicrographQL.base_uri+"from";
+	    if(sortPredicate === '$state')
+		predicate = MicrographQL.base_uri+"state";
+
 	    predicate = MicrographQL.parseURI(sortPredicate);
 	    var sortVariable = nextVariable+'s'+sortCounter;
 	    sortCounter++;
@@ -9307,20 +9444,12 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 	}
     }
 
-    if(this.limitValue != null)
-	unit.limit = this.limitValue;
-
-    if(this.offsetValue != null) 
-	unit.offset = this.offsetValue;
-
     if(sortAcum.length > 0)
 	unit.order = sortAcum;
-
 
     if(callback != null )
 	this.callback = callback;
 
-    var that = this;
     var toReturn = [];
 
     if(this.kind === "all") {
@@ -9328,6 +9457,8 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 
 	this.store.execute(this.query, function(success, results) {
 	    //console.log("results : "+results.length);
+	    //console.log(results);
+	    //console.log("=======================");
 	    if(MicrographQL.isUri(that.varsMap[that.topLevel]) && results.length>0) {
 		// if the top level is a URI, not retrieved in the results,
 		// and there are results, we add the node to one result
@@ -9337,30 +9468,98 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 
 	    if(success) {
 
-		toReturn = MicrographQuery._processQueryResults(results, that.topLevel, that.varsMap, that.inverseMap, that.store);
+		toReturn = MicrographQuery._processQueryResults(results, that.topLevel, that.varsMap, that.inverseMap, that.store, that.offsetValue, that.limitValue);
+		that.offsetValue = null;
+		that.limitValue = null;
 
-		if(that.filter != null) {
-		    var filtered = [];
-		    var filteredResult;
-		    Utils.repeat(0,toReturn.length, function(k,env) {
-			var floop = arguments.callee;
-			var result = toReturn[env._i];
-			filteredResult = that.filter(result) || result;
-			if(filtered !== false)
-			    filtered.push(filteredResult);
-			k(floop,env);
-		    }, function(env) {
-			callback(filtered); 
-		    });
+		if(that.filter.length>0) {
+		    that._applyResultFilter(toReturn, callback);
 		} else {	
-		    callback(toReturn);
+		    if(that.groupPredicate != null) 
+			that._groupResults(toReturn, callback);
+		    else
+			callback(toReturn);
 		}
 	    } else {
 		if(that.onErrorCallback) {
 		    that.onError(results);
-		} else {
-		    that.callback(null);
 		}
+		that.callback(null);
+	    }
+	});
+    } else if(this.kind === 'tuples') {
+	//console.log(sys.inspect(this.query, true, 20));
+	this.store.execute(this.query, function(success, results) {
+	    if(success) {
+		callback(results);
+	    } else {
+		if(that.onErrorCallback) {
+		    that.onError(results);
+		}
+		that.callback(null);
+	    }
+	});
+    } else if(this.kind === 'traverseAll') {
+	//console.log(sys.inspect(this.query, true, 20));
+	this.store.execute(this.query, function(success, results) {
+	    if(success) {
+		var toReturn = [];
+		var nodes = {};
+		var disambiguations = {};
+		var toIgnore = {};
+		for(var i=0; i<results.length; i++) {
+		    var result = results[i];
+		    if(that.startNodePath != null)
+			result['start'] = that.startNodePath;
+		    if(that.endNodePath != null)
+			result['end'] = that.endNodePath;
+		    if(result['start'].token === 'uri') {
+			var id = result['start'].value;
+			if(nodes[id] == null) {
+			    that.store.execute(MicrographQL.singleNodeQuery(id, 'p', 'o'), function(success, resultsNode){
+				var node = nodes[id] || {'$id':(id.indexOf(MicrographQL.base_uri) != -1 ? id.split(MicrographQL.base_uri)[1] : id)};
+				nodes[id] = node;
+
+				MicrographQuery._processSingleNodeResults(id, resultsNode, node, disambiguations, nodes, {});
+				result['start'] = node;
+			    });
+			} else {
+			    result['start'] = nodes[id];
+			}
+		    } else {
+			result['start'] = MicrographQL.literalToJS(result['start']);
+		    }
+		    if(result['end'].token === 'uri') {
+			var id = result['end'].value;
+			if(nodes[id] == null) {
+			    that.store.execute(MicrographQL.singleNodeQuery(id, 'p', 'o'), function(success, resultsNode){
+				var node = nodes[id] || {};
+				nodes[id] = node;
+
+				MicrographQuery._processSingleNodeResults(id, resultsNode, node, disambiguations, nodes, {});
+				result['end'] = node;
+			    });
+			} else {
+				result['end'] = nodes[id];
+			}
+		    } else {
+			result['end'] = MicrographQL.literalToJS(result['end']);
+		    }
+		}
+
+		if(that.filter.length>0) {
+		    that._applyResultFilter(results, callback);
+		} else {
+		    if(that.groupPredicate != null) 
+			that._groupResults(results, callback);
+		    else
+			that.callback(results);
+		}
+	    } else {
+		if(that.onErrorCallback) {
+		    that.onError(results);
+		}
+		that.callback(null);
 	    }
 	});
     }
@@ -9368,6 +9567,8 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 
 MicrographQuery.prototype._parseQuery = function(object) {
     var context = MicrographQL.newContext(true);
+    if(this.kind === 'tuples' || this.kind === 'traverseAll')
+	context.nodes = false;
     var result = MicrographQL.parseBGP(object, context, true);
     var subject = result[0];
 
@@ -9491,7 +9692,7 @@ MicrographQuery.prototype._parseModifyNodes = function(object, callback) {
 	callback(counter);
 };
 
-MicrographQuery.prototype._unlinkNode = function(id,cb){
+MicrographQuery.prototype._unlinkNode = function(id,cb,excludeIncoming){
     if(cb == null)
 	cb = function(){};
 
@@ -9505,11 +9706,15 @@ MicrographQuery.prototype._unlinkNode = function(id,cb){
 				      'object': {'token':'var', 'value':nextVariable+'oout'}}]);
 
     that.store.execute(pattern.query, function(success,res) {
-	pattern = that._modifyQuery([{'subject': {'token':'var', 'value':nextVariable+'sin'},
-				      'predicate': {'token':'var', 'value':nextVariable+'pin'},
-				      'object': subject}]);
+	if(!(excludeIncoming === true)) {
+	    pattern = that._modifyQuery([{'subject': {'token':'var', 'value':nextVariable+'sin'},
+					  'predicate': {'token':'var', 'value':nextVariable+'pin'},
+					  'object': subject}]);
 	
-	that.store.execute(pattern.query, cb);
+	    that.store.execute(pattern.query, cb);
+	} else {
+	    cb(true);
+	}
     });
 }
 
@@ -9538,7 +9743,7 @@ MicrographQuery.prototype._modifyQuery = function(quads) {
 		      'units':[unit]}};		 
 };
 
-MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inverseMap, store) {
+MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inverseMap, store, offsetValue, limitValue) {
     var pushed = {};
     var processed = {};
     var ignore = {};
@@ -9547,6 +9752,34 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
     var result, isTopLevel, nodeDisambiguations;
     var counter = 0;
     var toReturn = [];
+    var that = this;
+
+    if(offsetValue != null || limitValue != null) {
+	offsetValue = offsetValue || 0;
+	limitValue = limitValue || (results.length - offsetValue);
+	limitValue = offsetValue+limitValue;
+	var resultsAcum = [], resultsAcumMap = {}, idVal, goodResults = {};
+	var nodesFound = 0;
+
+	for(var i=0; i<results.length; i++) {
+	    idVal = results[i][topLevel].value;
+
+	    if(resultsAcumMap[idVal] == null) {
+		resultsAcumMap[idVal] = true;
+		if(nodesFound>=offsetValue && nodesFound<limitValue) {
+		    goodResults[idVal] = true;
+		    resultsAcum.push(results[i]);
+		}
+		nodesFound++;
+	    } else {
+		if(goodResults[idVal]) {
+		    resultsAcum.push(results[i]);
+		}
+	    }
+	}
+
+	results = resultsAcum;
+    }
 
     for(var i=0; i<results.length; i++) {
 	result = results[i];
@@ -9561,7 +9794,7 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 	    if(p === topLevel)
 		isTopLevel = true;
 
-	    var id = idp.split(MicrographQL.base_uri)[1];
+	    var id = (idp.indexOf(MicrographQL.base_uri) != -1 ? idp.split(MicrographQL.base_uri)[1] : idp);
 
 	    var node = nodes[id];
 	    node = node || {'$id': id};
@@ -9574,7 +9807,9 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 			var linkedObjId = results[i][varsMap[invLinks[linkedProp][0]]];
 			if(linkedObjId != null) {
 			    // this is a variable resolved to a URI in the bindings results
-			    linkedObjId = linkedObjId.value.split(MicrographQL.base_uri)[1];
+			    linkedObjId = linkedObjId.value;
+			    if(linkedObjId.indexOf(MicrographQL.base_uri) != -1)
+			       linkedObjId = linkedObjId.split(MicrographQL.base_uri)[1];
 			} else {
 			    linkedObjId = invLinks[linkedProp][0];
 			}
@@ -9611,8 +9846,6 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 		}
 	    }
 
-
-
 	    if(processed[id] == null) {		
 		toIgnore = ignore[id] || {};
 		ignore[id] = toIgnore;
@@ -9622,102 +9855,7 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 		    store.execute(MicrographQL.singleNodeQuery(idp, 'p', 'o'), function(success, resultsNode){
 			processed[id] = true;
 			counter++;
-
-			nodeDisambiguations = disambiguations[id] || {};
-			disambiguations[id] = nodeDisambiguations;
-
-			var obj = null;
-			for(var i=0; i<resultsNode.length; i++) {
-			    var obj = resultsNode[i]['o'];
-			    if(obj.token === 'uri') {
-				var oid = obj.value.split(MicrographQL.base_uri)[1];
-				var linked  = nodes[oid] || {};
-				linked['$id'] = oid;
-				nodes[oid] = linked;
-				obj = linked;
-			    } else {
-				obj = MicrographQL.literalToJS(obj);
-			    }
-
-			    var pred = resultsNode[i]['p'].value;
-			    if(pred === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
-				pred = '$type';
-
-			    if(toIgnore[pred])
-				continue;
-
-			    if(node[pred] && node[pred].constructor === Array) {
-				if(typeof(obj) === 'object' && obj['$id'] && nodeDisambiguations[pred][obj['$id']] == null) {
-				    nodeDisambiguations[pred][obj['$id']] = true;
-				    node[pred].push(obj);
-				} else if(typeof(obj) !== 'object' && obj.constructor === Date && nodeDisambiguations[pred]['date:'+obj.getTime()] == null) {
-				    nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
-				    node[pred].push(obj);
-				} else if(nodeDisambiguations[pred][obj] == null) {
-				    nodeDisambiguations[pred][obj] = true;
-				    node[pred].push(obj);
-				}
-			    } else if(node[pred]) {
-				if(typeof(node[pred]) === 'object' && node[pred]['$id'] != null) {
-				    if(typeof(obj) === 'object' && obj['$id'] != null) {
-					if(node[pred]['$id'] != obj['$id']) {
-					    node[pred] = [node[pred],obj];
-					    nodeDisambiguations[pred] = {};
-					    nodeDisambiguations[pred][node[pred][0]['$id']] = true;
-					    nodeDisambiguations[pred][node[pred][1]['$id']] = true;
-					}
-				    } else {
-					nodeDisambiguations[pred] = {};
-					nodeDisambiguations[pred][node[pred]['$id']] = true;
-					if(typeof(obj) === 'object') {
-					    nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
-					} else {
-					    nodeDisambiguations[pred][obj] = true;
-					}
-					node[pred] = [node[pred],obj];
-				    }
-				} else if(typeof(node[pred]) === 'object') {
-				    if(typeof(obj) === 'object' && obj['$id'] == null) {
-					if(node[pred].getTime() !== obj.getTime()) {
-					    node[pred] = [node[pred],obj];
-					    nodeDisambiguations[pred] = {};
-					    nodeDisambiguations[pred]['date:'+node[pred][0].getTime()] = true;
-					    nodeDisambiguations[pred]['date:'+node[pred][1].getTime()] = true;
-					}
-				    } else {
-					nodeDisambiguations[pred] = {};
-					nodeDisambiguations[pred]['date:'+node[pred].getTime()] = true;
-					if(typeof(obj) === 'object') {
-					    nodeDisambiguations[pred][obj['$id']] = true;
-					} else {
-					    nodeDisambiguations[pred][obj] = true;
-					}
-					node[pred] = [node[pred],obj];
-				    }
-				} else {
-				    if(typeof(obj) !== 'object') {
-					if(obj != node[pred]) {
-					    nodeDisambiguations[pred] = {};
-					    nodeDisambiguations[pred][obj] = true;
-					    nodeDisambiguations[pred][node[pred]] = true;
-					    node[pred] = [node[pred],obj];
-					}
-				    } else {
-					nodeDisambiguations[pred] = {};
-					nodeDisambiguations[pred][node[pred]] = true;
-
-					if(obj['$id'] == null) {
-					    nodeDisambiguations[pred][obj['$id']] = true;						    
-					} else {
-					    nodeDisambiguations[pred]['date:'+obj.getTime()] = true;						    
-					}
-					node[pred] = [node[pred],obj];
-				    }
-				}
-			    } else {
-				node[pred] = obj;
-			    }
-			}
+			that._processSingleNodeResults(id, resultsNode, node, disambiguations, nodes, toIgnore);
 
 			if(isTopLevel && pushed[node['$id']] == null) {
 			    toReturn.push(node);
@@ -9739,6 +9877,173 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 
     return toReturn;
 }
+
+
+MicrographQuery._processSingleNodeResults = function(id, resultsNode, node, disambiguations, nodes, toIgnore) {
+    nodeDisambiguations = disambiguations[id] || {};
+    disambiguations[id] = nodeDisambiguations;
+
+    var obj = null;
+    for(var i=0; i<resultsNode.length; i++) {
+	var obj = resultsNode[i]['o'];
+	if(obj.token === 'uri') {
+	    if(obj.value === MicrographQL.NIL) {
+		obj = null;
+	    } else {
+		var oid = (obj.value.indexOf(MicrographQL.base_uri) != -1 ? obj.value.split(MicrographQL.base_uri)[1] : obj.value);
+		var linked  = nodes[oid] || {};
+		linked['$id'] = oid;
+		nodes[oid] = linked;
+		obj = linked;
+	    }
+	} else {
+	    obj = MicrographQL.literalToJS(obj);
+	}
+
+	var pred = resultsNode[i]['p'].value;
+
+	if(pred === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+	    pred = '$type';
+	if(pred === MicrographQL.base_uri+"from")
+	    pred = '$from';
+	if(pred === MicrographQL.base_uri+'state')
+	    pred = '$state';
+
+	if(toIgnore[pred])
+	    continue;
+
+	if(node[pred] && node[pred].constructor === Array && obj !== null) {
+	    if(typeof(obj) === 'object' && obj['$id'] && nodeDisambiguations[pred][obj['$id']] == null) {
+		nodeDisambiguations[pred][obj['$id']] = true;
+		node[pred].push(obj);
+	    } else if(typeof(obj) !== 'object' && obj.constructor === Date && nodeDisambiguations[pred]['date:'+obj.getTime()] == null) {
+		nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
+		node[pred].push(obj);
+	    } else if(nodeDisambiguations[pred][obj] == null) {
+		nodeDisambiguations[pred][obj] = true;
+		node[pred].push(obj);
+	    }
+	} else if(node[pred] && obj !== null) {
+	    if(typeof(node[pred]) === 'object' && node[pred]['$id'] != null) {
+		if(typeof(obj) === 'object' && obj['$id'] != null) {
+		    if(node[pred]['$id'] != obj['$id']) {
+			node[pred] = [node[pred],obj];
+			nodeDisambiguations[pred] = {};
+			nodeDisambiguations[pred][node[pred][0]['$id']] = true;
+			nodeDisambiguations[pred][node[pred][1]['$id']] = true;
+		    }
+		} else {
+		    nodeDisambiguations[pred] = {};
+		    nodeDisambiguations[pred][node[pred]['$id']] = true;
+		    if(typeof(obj) === 'object') {
+			nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
+		    } else {
+			nodeDisambiguations[pred][obj] = true;
+		    }
+		    node[pred] = [node[pred],obj];
+		}
+	    } else if(typeof(node[pred]) === 'object') {
+		if(typeof(obj) === 'object' && obj['$id'] == null) {
+		    if(node[pred].getTime() !== obj.getTime()) {
+			node[pred] = [node[pred],obj];
+			nodeDisambiguations[pred] = {};
+			nodeDisambiguations[pred]['date:'+node[pred][0].getTime()] = true;
+			nodeDisambiguations[pred]['date:'+node[pred][1].getTime()] = true;
+		    }
+		} else {
+		    nodeDisambiguations[pred] = {};
+		    nodeDisambiguations[pred]['date:'+node[pred].getTime()] = true;
+		    if(typeof(obj) === 'object') {
+			nodeDisambiguations[pred][obj['$id']] = true;
+		    } else {
+			nodeDisambiguations[pred][obj] = true;
+		    }
+		    node[pred] = [node[pred],obj];
+		}
+	    } else {
+		if(typeof(obj) !== 'object') {
+		    if(obj != node[pred]) {
+			nodeDisambiguations[pred] = {};
+			nodeDisambiguations[pred][obj] = true;
+			nodeDisambiguations[pred][node[pred]] = true;
+			node[pred] = [node[pred],obj];
+		    }
+		} else {
+		    nodeDisambiguations[pred] = {};
+		    nodeDisambiguations[pred][node[pred]] = true;
+
+		    if(obj['$id'] == null) {
+			nodeDisambiguations[pred][obj['$id']] = true;						    
+		    } else {
+			nodeDisambiguations[pred]['date:'+obj.getTime()] = true;						    
+		    }
+		    node[pred] = [node[pred],obj];
+		}
+	    }
+	} else {
+	    node[pred] = obj;
+	}
+    }
+
+};
+
+MicrographQuery.prototype._applyResultFilter = function(toReturn, callback) {
+    var nextFilter = this.filter.shift();
+    var filterType = nextFilter[0];
+    var reduceAcum = null;
+    var filtered = [];
+    var filteredResult;
+    var that = this;
+    Utils.repeat(0,toReturn.length, function(k,env) {
+	var floop = arguments.callee;
+	var result = toReturn[env._i];
+	if(filterType === 'reduce') {
+	    reduceAcum = nextFilter[1];
+	    filteredResult = nextFilter[2](reduceAcum, result);
+	} else
+	    filteredResult = nextFilter[1](result);
+	if(filterType === 'select') {
+	    if(filteredResult !== false)
+		filtered.push(result);
+	} else {
+	    if(filterType === 'map')
+		filtered.push(filteredResult);
+	    else if(filterType === 'each')
+		filtered.push(result);
+	    else if(filterType === 'reduce')
+		reduceAcum = filteredResult;
+	}
+	k(floop,env);
+    }, function(env) {
+	if(filterType === 'reduce')
+	    filtered = reduceAcum;
+
+	if(that.filter.length === 0) {
+	    if(that.groupPredicate != null) 
+		that._groupResults(filtered, callback);
+	    else
+		callback(filtered); 
+	} else
+	    that._applyResultFilter(filtered, callback);
+    });
+
+};
+
+
+MicrographQuery.prototype._groupResults = function(results, callback) {
+    if(results) {
+	var acum = {};
+	for(var i=0; i<results.length; i++) {
+	    var value = this.groupPredicate(results[i]);
+	    var group = acum[value] || [];
+	    group.push(results[i]);
+	    acum[value] = group;
+	}
+	callback(acum);
+    } else {
+	callback(null);
+    }
+};
 // end of ./src/micrograph/src/micrograph_query.js 
 // exports
 var MicrographClass = {};
@@ -9825,7 +10130,7 @@ MicrographClass.isInstance = function(resource, klass) {
         return false;
     } else if(klass.indexOf("prop(") === 0) {
         var propertyUri = klass.slice(0,klass.length-1).split("prop(")[1];
-        return resource[propertyUri] != null
+        return resource[propertyUri] != null;
     } else if(klass.indexOf("not(") === 0) {
         var expression = klass.slice(0,klass.length-1).split("not(")[1];
 	return !MicrographClass.isInstance(resource,expression);
@@ -9838,7 +10143,7 @@ MicrographClass.isInstance = function(resource, klass) {
 		}
 		return false;
 	    } else {
-		return resource['$type'] === klass
+		return resource['$type'] === klass;
 	    }
 	} else {
 	    return false;
@@ -9872,10 +10177,13 @@ var Micrograph = function(options, callback) {
     this.callbackCounter = 0;
     this.callbackToNodes = {};
     this.nodesToCallbacks = {};
+    this.resources = [];
     this.lastQuery = null;
     this.lastDataToLoad = null;
     this.errorCallback = null;
     this.transformFunction = null;
+    this.defaultFrom = null;
+    this.defaultState = 'created';
 
     for(var i=0; i<Micrograph.vars.length; i++) {
 	this['_'+Micrograph.vars[i]] = this._(Micrograph.vars[i]);
@@ -9932,7 +10240,7 @@ var Micrograph = function(options, callback) {
     },options['name']);
 };
 
-Micrograph.VERSION = "0.2.0";
+Micrograph.VERSION = "0.4.0";
 
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
@@ -9978,33 +10286,181 @@ Micrograph.prototype.define = function(classExpression, object) {
     return this;
 };
 
-Micrograph.prototype.instantiate = function(object) {
-    console.log(object.$id);
-    if(object['__micrograph__classes__'] != null) {
-	console.log("not recur");
-	return;
-    }
-    for(var p in object) {
-	if(typeof(object[p]) === 'object' && object[p].constructor != Date) {
-	    if(object[p].constructor == Array) {
-		for(var i=0; i<object[p].length; i++)
-		    if(typeof(object[p][i]) === 'object' && object[p][i].constructor != Date)
-			this.instantiate(object[p][i]);
-	    } else {
-		this.instantiate(object[p]);
-	    }
-	}
-    }
-    MicrographClass.check(object);
+Micrograph.prototype.resource = function(resource) {
+    this.resources.push(resource);
     return this;
 };
 
-Micrograph.prototype.startGraphModification = function() {
-    this.engine.startGraphModification();
+Micrograph.prototype.resourceAccepts = function(resource,obj) {
+    if(resource['$type']){
+	if(obj['$type'] && obj['$type'].constructor === Array) {
+	    for(var i=0; i<obj['$type'].length; i++) {
+		if(obj['$type'][i] === resource['$type']) {
+		    if(resource['accepts']) 
+			return resource['accepts'](obj);
+		    else
+			return true;
+		}
+	    }
+	    return false;
+	} else {
+	    if(obj['$type'] === resource['$type']){
+		if(resource['accepts']) 
+		    return resource['accepts'](obj);
+		else
+		    return true;
+	    }
+	}
+    } else
+	return false;
 };
 
-Micrograph.prototype.endGraphModification = function() {
-    this.engine.endGraphModification();
+Micrograph.prototype.toJSON = function(obj) {
+    var json = JSON.parse(JSON.stringify(obj));
+    var acum = [json];
+    var current;
+    while(acum.length > 0) {
+	current = acum.pop();
+	if(current.constructor === Array) {
+	    for(var i=0; i<current.length; i++)
+		acum.push(current[i]);
+	} else {
+	    for(var p in current) {
+		if(p=='$id' || p=='$type' || p=='$from' || p.indexOf("$in") != -1 || 
+		   p=='$state' || p.indexOf("__")==0 || typeof(current[p])==='function')
+		    delete current[p]
+		else if(current[p] && typeof(current[p]) === 'object' && current[p].constructor != Date) 
+		    acum.push([p,current[p]]);
+	    }
+	}
+    }
+
+    return json;
+};
+
+/*
+Micrograph.prototype.processResource = function(resource,obj, cb) {
+    var that = this;
+    if(resource['post']) {
+	resource['post'](obj,cb);
+    } else {
+	var obj = obj;
+	if(resource['template']) {
+	    resource['template']['$id'] = obj['$id'];
+	    that.where(resource['template']).first(function(res) {
+		obj = res;
+	    });
+	}
+	Micrograph.ajax('POST', resource['baseURL'], JSON.stringify(that.toJSON(obj)), function(result, xhr) {
+	    debugger;
+	    resource.transform(result);
+	    // we save a mapping from the generated ID to the remote ID
+	    that.indirections[result['$id']] = obj['$id'];
+	    var context = MicrographQL.newContext(true);
+	    context.nodes = false;
+	    var quads = MicrographQL.parseBGP({'$id':obj['$id'], '$state':obj['$state'], '$remoteid':result['$id']}, context, true)[1]
+	    quads = quads.concat(context.quads);
+	    var deleteQuery = Micrograph._deleteDataQuery(quads);
+
+	    that.engine.execute(deleteQuery, function(success, rs) {
+
+		if(xhr.getResponseHeader && (xhr.getResponseHeader['Content-Location'] || xhr.getResponseHeader['content-location'])) {
+		    obj['$from'] = (xhr.getResponseHeader['Content-Location'] || xhr.getResponseHeader['content-location']);
+		} else {
+		    obj['$from'] = resource['baseURL']+(resource['baseURL'][resource['baseURL'].length-1] === '/' ? result['$id'] : "/"+result['$id']);
+		}
+
+		obj['$state'] = 'loaded';
+
+
+		context = MicrographQL.newContext(true);
+		context.nodes = false;
+		quads = MicrographQL.parseBGP({'$id':obj['$id'], '$state':'loaded', '$from':obj['$from']}, context, true)[1]
+		quads = quads.concat(context.quads);
+		var insertQuery = Micrograph._insertDataQuery(quads);
+
+		that.engine.execute(insertQuery, function(success, rs) {
+		    cb(true);
+		});
+	    });
+	}, function(status, xhr) {
+	    cb(false);
+	});
+    }
+};
+
+
+Micrograph.prototype.sync = function(cb) {
+    var that = this;
+    that.startGraphModification('sync');
+    // create resources
+    this.where({'$state':'created'})
+	.all(function(objects) {
+	    Utils.repeatAsync(0,objects.length, function(k,env) {
+		var floop = arguments.callee;
+		var foundResource = false;
+		for(var i=0; i<that.resources.length; i++) {
+		    if(that.resourceAccepts(that.resources[i],objects[i])) {
+			foundResource = true;
+			that.processResource(that.resources[i], objects[i], function() {
+			    k(floop,env);
+			});
+		    }
+		}
+		if(!foundResource) {
+		    k(floop,env);
+		}
+
+	    },function() {
+		//todo
+		console.log("done!");
+		that.endGraphModification('sync');
+	    })
+
+	});
+    return this;
+};
+*/
+
+Micrograph.prototype.instantiate = function(object) {
+    if(object['__micrograph__classes'] != null) {
+	return this;
+    }
+    
+    MicrographClass.check(object);
+    for(var p in object) {
+	if(typeof(object[p]) === 'object' && object[p]!=null) {
+	    if(object[p].constructor == Array) {
+		for(var i=0; i<object[p].length; i++)
+		    if(typeof(object[p][i]) === 'object' && object[p][i].$id)
+			this.instantiate(object[p][i]);
+	    } else {
+		if(object[p].$id)
+		    this.instantiate(object[p]);
+	    }
+	}
+    }
+    return this;
+};
+
+Micrograph.prototype.modificationName = null;
+
+Micrograph.prototype.startGraphModification = function(name) {
+    if(name != null && this.modificationName!=null)
+	throw("Modification already being executed");
+    else {
+	if(this.modificationName == null) {
+	    this.modificationName = name;
+	    this.engine.startGraphModification();
+	} 
+    }
+};
+
+Micrograph.prototype.endGraphModification = function(name) {
+    if(name === this.modificationName || this.modificationName == null) {
+	this.modificationName = null;
+	this.engine.endGraphModification();
+    }
 };
 
 Micrograph.prototype.execute = function(query, callback) {
@@ -10018,6 +10474,17 @@ Micrograph.prototype.where = function(query) {
     var queryObj =  new MicrographQuery(query);
     this.lastQuery = queryObj;
     queryObj.setStore(this);
+    return queryObj;
+};
+
+Micrograph.prototype.traverse = function(path) {
+    
+    var template = {'$id': this._('start')};
+    template[path] = this._('end');
+    var queryObj =  new MicrographQuery(template);
+    this.lastQuery = queryObj;
+    queryObj.setStore(this);
+    queryObj.setKind('traverse');
     return queryObj;
 };
 
@@ -10038,6 +10505,50 @@ Micrograph.prototype.instances = function(callback) {
 
 Micrograph.prototype._ = function(varName) {
     return {'token': 'var', 'value':varName };
+};
+
+Micrograph.normalize = function(data, oneLevel) {
+    oneLevel = oneLevel || false;
+    var acum = [data];
+    var toReturn = [];
+
+    if(typeof(data) == 'object' && data.constructor === Array)
+	acum = data;
+
+    var current, next, tmp;
+    while(acum.length > 0) {
+	current = acum.pop();
+	if(current.constructor === Array && current == null) {
+	    for(var i=0; i<current.length; i++) {
+		acum.push(current[i]);
+	    }
+	} else {
+	    for(var p in current) {
+		if(current[p] && typeof(current[p]) === 'object' && current[p].constructor != Array && current[p].constructor != Date)  {
+		    next = current[p];
+		    if(next['$id']!=null)
+			current[p] = {'$id':next['$id']};
+		    if(!oneLevel || next['$id']==null)
+			acum.push(next);
+		} else if(current[p] && typeof(current[p]) === 'object' && current[p].constructor == Array) {
+		    tmp = [];
+		    for(var i=0; i<current[p].length; i++) {
+			if(!oneLevel || current[p][i]['$id']==null)
+			    acum.push(current[p][i]);
+			if(current[p][i].$id != null)		
+			    tmp.push({'$id': current[p][i]['$id']});
+			else
+			    tmp.push(current[p][i]);
+		    }
+		    current[p] = tmp;
+		}
+	    }
+	    if(current['$id'] != null)
+		toReturn.push(current);
+	}
+    }
+
+    return toReturn;
 };
 
 Micrograph.prototype.load = function() {
@@ -10066,21 +10577,39 @@ Micrograph.prototype.load = function() {
     graph = {'token':'uri', 'value': this.engine.lexicon.defaultGraphUri};
 
     if(this.lastDataToLoad != null) {
-	var options = this.lastDataToLoad;
-	this.lastDataToLoad = null;
-	if(options['jsonp'] != null) {
-	    Micrograph.jsonp(options['uri'], function(data) {
-		that.load(data,callback);
-	    }, this.errorCallback, options['jsonp']);
+	if(this.lastDataToLoad.constructor === Array) {
+	    var data = [];
+	    var acum = this.lastDataToLoad;
+	    Utils.repeatAsync(0,acum.length, function(k,env) {
+		var floop = arguments.callee;
+		that.lastDataToLoad = acum[env._i];
+		that.defaultFrom = acum[env._i]['uri'];;
+		that.load(function(result) {
+		    if(result.constructor && result.constructor === Array) {
+			data = data.concat(result);
+		    } else {
+			data.push([acum[env._i]['uri'],result]);
+		    }
+		    k(floop,env);
+		});
+	    }, function() {
+		callback(data);
+	    });
 	} else {
-	    Micrograph.ajax('GET', options['uri'], null, function(data){
-		that.load(data,callback);
-	    }, this.errorCallback);
+	    var options = this.lastDataToLoad;
+	    this.lastDataToLoad = null;
+	    if(options['jsonp'] != null) {
+		Micrograph.jsonp(options['uri'], function(data) {
+		    that.load(data,callback);
+		}, this.errorCallback, options['jsonp'], options);
+	    } else {
+		Micrograph.ajax('GET', options['uri'], null, function(data){
+		    that.load(data,callback);
+		}, this.errorCallback);
+	    }
 	}
 	return this;
-    }
-
-    if(typeof(data) === "object") {
+    } else if(typeof(data) === "object") {
 	if(data.constructor !== Array) {
 	    data = [data];
 	}
@@ -10094,7 +10623,11 @@ Micrograph.prototype.load = function() {
 		    for(var i=0; i<current[1].length; i++)
 			acum.push([current[0], current[1][i]]);
 		} else {
-		    this.transformFunction(current[0],current[1]);
+		    var uriFrom = null;
+		    if(this.defaultFrom != null)
+			uriFrom = (this.defaultFrom.indexOf("?") != -1 ? this.defaultFrom.split("?")[0] : this.defaultFrom);
+
+		    this.transformFunction(current[0],current[1], uriFrom);
 		    for(var p in current[1]) {
 			if(current[1][p] && typeof(current[1][p]) === 'object' && current[1][p].constructor != Date) 
 			    acum.push([p,current[1][p]]);
@@ -10103,21 +10636,25 @@ Micrograph.prototype.load = function() {
 	    }
 	}
 	// clean the transform function
-	this.transformFunction = null;
+	//this.transformFunction = null;
 
 	var quads;
 	var that = this;
 
 	for(var i=0; i<data.length; i++) {
-	    quads = MicrographQL.parseJSON(data[i],graph);
+	    quads = MicrographQL.parseJSON(data[i],graph, this.defaultFrom, this.defaultState);
 
 	    //console.log("LOAD");
 	    //console.log(quads);
-	    that.engine.startGraphModification();
+	    that.startGraphModification();
 	    that.engine.batchLoad(quads,function(){ 
-		that.engine.endGraphModification();
+		that.endGraphModification();
 	    });
 	}
+
+	this.defaultFrom = null;
+	this.defaultState = 'created';
+
 	if(callback)
 	    callback(data);
     }
@@ -10127,6 +10664,7 @@ Micrograph.prototype.load = function() {
 };
 
 Micrograph.prototype.save = function(json,cb) {
+    this.transformFunction = null;
     this.load(json, function(objects){
 	if(cb)
 	    cb(objects[0]);
@@ -10140,16 +10678,28 @@ Micrograph.prototype.update = function(json, cb) {
 	cb(false,"ID must be provided");
     } else {
 
-	var that = this;
-	that.engine.startGraphModification();	
-	this.where({'$id': id})._unlinkNode(id,function(success, _){
-	    if(success) {
-		that.save(json,cb);
+	var normalized = Micrograph.normalize(json,true);
+	var that = this, current;
+	that.startGraphModification('update');	
+	for(var i=0; i<normalized.length; i++) {
+	    current = normalized[i];
+	    if(current.$id != null && current.$id === id) {
+		this.where({'$id': current.$id})._unlinkNode(current.$id,function(success, _){
+		    if(success) {
+			that.defaultState = 'dirty'
+			that.save(current);
+		    } else {
+			cb(false);
+		    }
+		}, true);
 	    } else {
-		cb(false);
+		this.defaultState = 'created'
+		that.save(current);
 	    }
-	})
-	that.engine.endGraphModification();
+	}
+	that.endGraphModification('update');
+	if(cb)
+	    cb(true);
     }
 };
 
@@ -10179,35 +10729,121 @@ Micrograph.prototype.bind = function(query, callback) {
 };
 
 Micrograph.prototype.from = function(uri, options, callback) {
+    this.transformFunction = null;
     if(options == null) {
 	options = {};
     } else if(typeof(options) === 'function'){
-	callback = options
+	callback = options;
 	options = {};
     }
+    var baseUri = uri, acum;
+    if(typeof(uri) === 'object' && uri.constructor === Array) {
+	baseUri = [];
+	acum = [];
+	for(var i=0; i<uri.length; i++) {
+	    var thisOptions = {};
+	    for(var p in options)
+		thisOptions[p] = options[p];
 
-    if(uri.indexOf("?") != -1 && 
-       uri.split("?")[1].indexOf("callback") != -1 &&
-       options['jsonp'] == null) {
-	options['jsonp'] = 'callback';
-    }
+	    if(uri[i].indexOf("?") != -1) {
+		baseUri.push(uri[i].split("?")[0]);
+	    }
+	    if(uri[i].indexOf("?") != -1 && uri[i].split("?")[1].indexOf("callback") != -1 && options['jsonp'] == null) {
+		thisOptions['jsonp'] = 'callback';
+	    }
+	    thisOptions['uri'] = uri[i];
+	    acum.push(thisOptions);
+	}
+	this.defaultFrom = baseUri;
+	this.defaultState = 'loaded';	
 
-    options['uri'] = uri;
-    if(callback != null) {
-	this.lastDataToLoad = null;
-	if(options['jsonp'] != null) {
-	    Micrograph.jsonp(options['uri'], callback, this.errorCallback, this.options['jsonp'])
+	if(callback != null) {
+	    var that = this;
+	    var data = [];
+	    Utils.repeatAsync(0,acum.length, function(k,env) {
+		var floop = arguments.callee;
+		that.from(that.acum[env._i]['uri'], acum[env._i], function(result) {
+		    data.push(result);
+		    k(floop,env);
+		});
+	    }, function() {
+		callback(data);
+	    });
 	} else {
-	    Micrograph.ajax('GET', options['uri'], null, callback, this.errorCallback)
+	    this.lastDataToLoad = acum;
 	}
     } else {
-	this.lastDataToLoad = options;
-    }
+	if(baseUri.indexOf("?") != -1) {
+	    baseUri = baseUri.split("?")[0];
+	}
+	if(uri.indexOf("?") != -1 && uri.split("?")[1].indexOf("callback") != -1 && options['jsonp'] == null) {
+	    options['jsonp'] = 'callback';
+	}
+	options['uri'] = uri;
+	this.defaultFrom = baseUri;
+	this.defaultState = 'loaded';	
 
+	if(callback != null) {
+	    this.lastDataToLoad = null;
+	    if(options['jsonp'] != null) {
+		Micrograph.jsonp(options['uri'], callback, this.errorCallback, options['jsonp'], options);
+	    } else {
+		Micrograph.ajax('GET', options['uri'], null, callback, this.errorCallback);
+	    }
+	} else {
+	    this.lastDataToLoad = options;
+	}
+    }
     return this;
 };
 
+Micrograph._parseTransformFunction = function(spec) {
+    return function(prop, obj) {
+	if(prop == null && spec['null'] != null)
+	    prop = 'null';
+
+	if(spec[prop]) {
+	    for(var p in spec[prop]) {
+		if(p === '@delete') {
+		    if(spec[prop][p].constructor === Array) 
+			for(var i=0; i<spec[prop][p].length; i++)
+			    delete obj[spec[prop][p][i]]
+		    else 
+			delete obj[spec[prop][p]]
+		} if(p === '@id'){
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj['$id'] = spec[prop][p](obj);
+		    } else {
+			obj['$id'] = obj[spec[prop][p]];
+		    }
+		} else if(p === '@type') {
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj['$type'] = spec[prop][p](obj);
+		    } else  {
+			obj['$type'] = obj[spec[prop][p]];
+		    }
+		} else if(p === '@from') {
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj['$from'] = spec[prop][p](obj);
+		    } else  {
+			obj['$from'] = obj[spec[prop][p]];
+		    }
+		} else {
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj[p] = spec[prop][p](obj);
+		    } else  {
+			obj[p] = obj[spec[prop][p]];
+		    }
+		}
+	    }
+
+	}
+    };
+};
+
 Micrograph.prototype.transform = function(f) {
+    if(typeof(f) === 'object') 
+	f = Micrograph._parseTransformFunction(f);
     this.transformFunction = f;
     return this;
 };
@@ -10227,12 +10863,15 @@ Micrograph.ajax = function(method, url, data, callback, errorCallback) {
     if (xhr.overrideMimeType) xhr.overrideMimeType("application/json");
     if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", "application/json");
 
+    if(data != null && xhr.setRequestHeader)
+	xhr.setRequestHeader("Content-Type", "application/json");
+
     xhr.onreadystatechange = function() {
 	if (xhr.readyState === 4) {
 	    if(xhr.status < 300 && xhr.status !== 0)
-		callback(JSON.parse(xhr.responseText));
+		callback(JSON.parse(xhr.responseText), xhr);
 	    else
-		errorCallback(xhr.statusText);
+		errorCallback(xhr.statusText, xhr);
 	}
     };
 
@@ -10243,9 +10882,16 @@ Micrograph.jsonpCallbackCounter = 0;
 Micrograph.jsonpRequestsConfirmations = {};
 Micrograph.jsonpRetries = {};
 
-Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, ignore) {
+Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, options, ignore) {
     ignore = ignore || false;
-    var cbHandler = "jsonp"+Micrograph.jsonpallbackCounter;
+    options = options || {};
+    var maxRetries = options['retries'];
+    if(maxRetries == null && maxRetries !== 0)
+	maxRetries = 1
+
+    var timeout = options['timeout'] || 15000;
+
+    var cbHandler = "jsonp"+Micrograph.jsonpCallbackCounter;
     Micrograph.jsonpCallbackCounter++;
 
     if(callbackParameter == null)
@@ -10264,10 +10910,10 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
 	}
     }
 
-    if(Micrograph.jsonpRetries[uri] == null) {
-	Micrograph.jsonpRetries[uri] = 0;
+    if(Micrograph.jsonpRetries[fragment] == null) {
+	Micrograph.jsonpRetries[fragment] = 0;
     } else {
-	Micrograph.jsonpRetries[uri] = Micrograph.jsonpRetries[uri]+1;
+	Micrograph.jsonpRetries[fragment] = Micrograph.jsonpRetries[fragment]+1;
     }
     window[cbHandler] = function(data) {
 	Micrograph.jsonpRequestsConfirmations[uri] = true;
@@ -10280,7 +10926,7 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
 	    delete Micrograph.jsonpRequestsConfirmations[uri];
 	    delete window[cbHandler];
 	} else {
-	    if(Micrograph.jsonpRetries[uri] < 1) {
+	    if(Micrograph.jsonpRetries[fragment] < maxRetries) {
 		console.log("(!!) JSONP error, retyring...");
 		console.log(fragment);
 		console.log(callbackParameter);
@@ -10288,23 +10934,62 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
 		if(ignore) {
 		    callback(null);
 		} else {
-		    Micrograph.jsonp(fragment, callback, errorCallback, callbackParameter, ignore);
+		    Micrograph.jsonp(fragment, callback, errorCallback, callbackParameter, options, ignore);
 		}
 	    } else {
-		delete Micrograph.jsonpRetries[uri];
+		delete Micrograph.jsonpRetries[fragment];
 		delete Micrograph.jsonpRequestsConfirmations[uri];
 		delete window[cbHandler];
 		if(errorCallback)
-		    errorCallback();
+		    errorCallback("Error loading JSONP request "+fragment);
 	    }
 	}
-    }, 15000);
+    }, timeout);
 
     var script = document.createElement('script');
     script.setAttribute('type','text/javascript');
     script.setAttribute('src', uri);
     document.getElementsByTagName('head')[0].appendChild(script); 
 };
+
+Micrograph._deleteDataQuery = function(quads) {
+    return {
+	"token": "query",
+	"kind": "update",
+	"prologue": {
+	    "token": "prologue",
+	    "base": "",
+	    "prefixes": []
+	},
+	"units": [
+	    {
+		"kind": "deletedata",
+		"token": "executableunit",
+		"quads": quads
+	    }
+	]
+    };
+};
+
+Micrograph._insertDataQuery = function(quads) {
+    return {
+	"token": "query",
+	"kind": "update",
+	"prologue": {
+	    "token": "prologue",
+	    "base": "",
+	    "prefixes": []
+	},
+	"units": [
+	    {
+		"kind": "insertdata",
+		"token": "executableunit",
+		"quads": quads
+	    }
+	]
+    };
+};
+
 // end of ./src/micrograph/src/micrograph.js 
 try {
   if(typeof(window) === 'undefined')

@@ -777,7 +777,7 @@ QueryFilters.effectiveTypeValue = function(val){
             // plain literal -> just manipulate the string
             return val.value;
         } else {
-            return val.value
+            return val.value;
         }
     } else {
         // @todo
@@ -886,7 +886,7 @@ QueryFilters.runEqualityFunction = function(op1, op2, bindings, queryEngine, dat
             return QueryFilters.ebvFalse();
         }
 
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
+        var comp = op1.value == op2.value;
         if(comp != null) {
             if(comp == 0) {
                 return QueryFilters.ebvTrue();
@@ -1451,7 +1451,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
     } else {
         var ops = [];
         for(var i=0; i<args.length; i++) {
-            ops.push(QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env))
+            ops.push(QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env));
         }
 
         var fun = Utils.lexicalFormBaseUri(iriref, env);
@@ -1623,12 +1623,12 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }            
         } else if(fun == "http://www.w3.org/2001/XMLSchema#dateTime" || fun == "http://www.w3.org/2001/XMLSchema#date") { 
-            from = ops[0];
+            var from = ops[0];
             if(from.type == "http://www.w3.org/2001/XMLSchema#dateTime" || from.type == "http://www.w3.org/2001/XMLSchema#date") {
                 return from;
             } else if(from.type == "http://www.w3.org/2001/XMLSchema#string" || from.type == null) {
                 try {
-                    from.value = Utils.iso8601(Utils.parseStrictISO8601(from.value));
+                    from.value = Utils.iso8601(from.value);
                     from.type = fun;
                     return from;
                 } catch(e) {

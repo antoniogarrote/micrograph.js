@@ -28,42 +28,11 @@
             mg.create(function(g) {
 		g.define('Commit', {color: 'orange',
 				    radius: function(){ return 5 },
-				    opacity: 0.8,
-			            treeParents: function() { if(this.parents) {
-					return (this.parents.length ? this.parents : [this.parents])
-				    } else {
-					return [];
-				    }},
-			            addNodesLinks: function(nodes, links, nodesMap){
-					if(nodesMap[this.$id] == null) {
-					    nodesMap[this.$id] = true;
-					    nodes.push(this);
-					    for(var i=0; i<this.treeParents().length; i++) {
-						var parent = this.treeParents()[i];
-						if(parent.addNodesLinks) {
-						    parent.addNodesLinks(nodes,links,nodesMap);
-						    links.push({source:this, target:this.treeParents()[i]});
-						}
-
-					    }
-					}
-				    }})
+				    opacity: 0.8})
 		    .define('Person', {color: 'lightBlue',
 				       committed: function(){ return (this.author$in.length ? this.author$in : [this.author$in]); },
 				       radius: function(){ return 30+(5*this.committed().length) },
-				       opacity: 0.3,
-				       addNodesLinks: function(nodes, links, nodesMap) {
-					   if(nodesMap[this.$id] == null) {
-					       nodesMap[this.$id] = true;
-					       nodes.push(this);
-					   }
-
-					   for(var i=0; i<this.committed().length; i++) {
-					       var commit = this.committed()[i];
-					       commit.addNodesLinks(nodes,links,nodesMap);
-					       links.push({source:this, target: commit})
-					   } 
-				       }})
+				       opacity: 0.3})
 		    .from("https://api.github.com/repos/"+user+"/"+project+"/commits?callback=loadCommits&per_page=100")
 		    .transform(function(prop,obj) {
 			if(prop == null) {
@@ -77,7 +46,7 @@
           			obj.author.email = obj.commit.author.email;
 				obj.author.name = obj.commit.author.name;
 			    }
-			    obj.date = new Date(obj.commit.author.date);
+			    obj.date = obj.commit.author.date;
 			    delete obj.commit;
 			} else if(prop === 'committer' || prop === 'author') {
 			    obj.$id = obj.url;
@@ -90,16 +59,48 @@
 			}
 		    })
 		    .load(function() {		     
-			g.where({$type: 'Person', 
-				 author$in:{ parents:{}}})
+			var people = {};
+			var commits = {};
+			var nodes = [];
+			var links = [];
+			g.where({$type: 'Person',
+				 author$in: {}})
 			    .all()
 			    .instances(function(authors) {
-				var links = [];
-				var nodes = [];
-				var nodesMap = {};
-
-				for(var i=0; i<authors.length; i++)
-				    authors[i].addNodesLinks(nodes,links,nodesMap);
+				for(var i=0; i<authors.length; i++) {
+				    people[authors[i].$id] = authors[i];
+				    nodes.push(authors[i]);
+				}
+			    })
+			    .where({$type: 'Commit',
+				    author:{}})
+			    .all()
+			    .instances(function(gitdata) {
+				console.log(gitdata.length);
+				for(var i=0; i<gitdata.length; i++) {
+				    if(commits[gitdata[i].$id] == null) {
+					commits[gitdata[i].$id] = gitdata[i];
+					nodes.push(gitdata[i]);
+				    }
+				}
+			    })
+			    .where({$id: g._s, author:g._t})
+			    .tuples(function(ls) {
+				for(var i=0; i<ls.length; i++) {
+				    var source = commits[ls[i].s.$id];
+				    var target = people[ls[i].t.$id];
+				    if(source!=null && target != null)
+					links.push({source: source, target: target});
+				}
+			    })
+			    .where({$id: g._x, parents:g._y})
+			    .tuples(function(ls) {
+				for(var i=0; i<ls.length; i++) {
+				    var source = commits[ls[i].x.$id];
+				    var target = commits[ls[i].y.$id];
+				    if(source != null && target != null)
+					links.push({source: source, target: target});
+				}
 
 				var w = 1200;
 				var h = 900;

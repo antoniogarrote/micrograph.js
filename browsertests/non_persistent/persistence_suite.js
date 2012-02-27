@@ -32,6 +32,8 @@ this.persistence_suite.creation_overwrite = function(test) {
 
 
 this.persistence_suite.creation_overwrite = function(test) {
+    this.localStorage.clear();
+
     var data = {
 	$type: 'Person',
 	name: 'Ludwig',
@@ -291,14 +293,14 @@ this.persistence_suite.filters3 = function(test) {
 				test.ok(bookCounter == 1);
 				test.ok(other == 0);
 
-				test.done()
+				test.done();
 			    });
 			
 		    });
 
 		});
 	});
-    })
+    });
 };
 
 
@@ -413,7 +415,7 @@ this.persistence_suite.inverseProperties = function(test) {
 };
 
 this.persistence_suite.remove1 = function(test) {
-    mg.create(function(g) {
+    mg.open('test',true,function(g) {
 	g.save([{$type: 'Person',
 		 name: 'Ludwig',
 		 surname: 'Wittgenstein',
@@ -457,7 +459,7 @@ this.persistence_suite.remove1 = function(test) {
 };
 
 this.persistence_suite.remove2 = function(test) {
-    mg.create(function(g) {
+    mg.open('test',true,function(g) {
 	g.save([{$type: 'Person',
 		 name: 'Ludwig',
 		 surname: 'Wittgenstein',
@@ -485,7 +487,7 @@ this.persistence_suite.remove2 = function(test) {
 };
 
 this.persistence_suite.remove3 = function(test) {
-    mg.create(function(g) {
+    mg.open('test',true,function(g) {
 	g.save([{$type: 'Person',
 		 name: 'Ludwig',
 		 surname: 'Wittgenstein',
@@ -509,7 +511,7 @@ this.persistence_suite.remove3 = function(test) {
 };
 
 this.persistence_suite.remove4 = function(test) {
-    mg.create(function(g) {
+    mg.open('test',true,function(g) {
 	g.save({$type: 'Person',
 		name: 'Ludwig',
 		surname: 'Wittgenstein',
@@ -533,7 +535,7 @@ this.persistence_suite.remove4 = function(test) {
 
 
 this.persistence_suite.remove5 = function(test) {
-    mg.create(function(g) {
+    mg.open('test',true,function(g) {
 	g.save([{$type: 'Person',
 		 name: 'Ludwig',
 		 surname: 'Wittgenstein',
@@ -562,7 +564,7 @@ this.persistence_suite.remove5 = function(test) {
 };
 
 this.persistence_suite.update1 = function(test) {
-    mg.create(function(g) {
+    mg.open('test',true,function(g) {
 	g.load([{$type: 'Person',
 	         name: 'Bertrand',
 	         surname: 'Russell'},
@@ -589,7 +591,7 @@ this.persistence_suite.update1 = function(test) {
 this.persistence_suite.bind1 = function(test) {
     try{
 	var counter = 0;
-	mg.create(function(g) {
+	mg.open('test',true,function(g) {
 	    g.where({$type:'Person'}).
 		bind(function(results) {
 		    counter++;
@@ -616,7 +618,7 @@ this.persistence_suite.bind1 = function(test) {
 this.persistence_suite.bind2a = function(test) {
     try{
 	var counter = 0;
-	mg.create(function(g) {
+	mg.open('test',true,function(g) {
 	    g.where({$type:'Person'}).
 		bind(function(results) {
 		    counter++;
@@ -655,7 +657,7 @@ this.persistence_suite.bind2a = function(test) {
 this.persistence_suite.bind2b = function(test) {
     try{
 	var counter = 0;
-	mg.create(function(g) {
+	mg.open('test',true,function(g) {
 	    g.where({$type:'Person'}).
 		bind(function(results) {
 		    counter++;

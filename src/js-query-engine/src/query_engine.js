@@ -830,6 +830,8 @@ QueryEngine.QueryEngine.prototype.groupSolution = function(bindings, group, data
 QueryEngine.QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern, env) {
     if(pattern.kind === "BGP") {
         return this.executeAndBGP(projection, dataset, pattern, env);
+    } else if(pattern.kind === "UNION") {
+        return this.executeUNION(projection, dataset, pattern.value, env);            
     } else if(pattern.kind === "JOIN") {
         return this.executeJOIN(projection, dataset, pattern, env);            
     } else if(pattern.kind === "LEFT_JOIN") {
@@ -976,6 +978,34 @@ QueryEngine.QueryEngine.prototype.executeZeroOrMorePath = function(pattern, data
     } else {
 	throw "Kind of path not supported!";
     }
+};
+
+QueryEngine.QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env) {
+    var setQuery1 = patterns[0];
+    var setQuery2 = patterns[1];
+    var set1 = null;
+    var set2 = null;
+
+    if(patterns.length != 2) {
+        throw("SPARQL algebra UNION with more than two components");
+    }
+
+    var that = this;
+    var sets = [];
+
+    set1 = that.executeSelectUnit(projection, dataset, setQuery1, env);
+    if(set1==null) {
+        return null;
+    }
+
+    set2 = that.executeSelectUnit(projection, dataset, setQuery2, env);
+    if(set2==null) {
+        return null;
+    }
+
+    var result = QueryPlan.unionBindings(set1, set2);
+    result = QueryFilters.checkFilters(patterns, result, false, dataset, env, that);
+    return result;
 };
 
 QueryEngine.QueryEngine.prototype.executeAndBGP = function(projection, dataset, patterns, env) {

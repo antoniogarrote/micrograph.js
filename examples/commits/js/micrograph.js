@@ -215,6 +215,7 @@ Utils.parseISO8601 = function (str) {
         "(Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?";
     var d = str.match(new RegExp(regexp));
 
+    debugger;
     var offset = 0;
     var date = new Date(d[1], 0, 1);
 
@@ -8741,7 +8742,7 @@ MicrographQL.filterNames = {'$eq':true, '$lt':true, '$gt':true, '$neq':true, '$l
 
 MicrographQL.newContext = function(isQuery) {
     return {variables: [], isQuery:isQuery, quads:[], varsMap: {}, 
-	    filtersMap: {}, inverseMap:{}};
+	    filtersMap: {}, inverseMap:{}, nodes: true};
 };
 
 MicrographQL.isFilter = function(val) {
@@ -8924,6 +8925,8 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 	    if(expression['$id']['token'] ==='var') {
 		// this node is an inverse relationship
 		subject = expression['$id'];
+		if(!context.nodes)
+		    context.variables.push(subject);
 	    } else {
 		subject = MicrographQL.parseURI(MicrographQL.base_uri+expression['$id']);
 	    }
@@ -8932,7 +8935,8 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 	context.varsMap[nextVariable] = subject.value;
     } else {
 	subject = {'token':'var', 'value':nextVariable};
-	context.variables.push(subject);
+	if(context.nodes)
+	    context.variables.push(subject);
 	context.varsMap[nextVariable] = nextVariable;
     }
 
@@ -9009,8 +9013,12 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph) {
 			quads.push(quad);
 		    } else if(typeof(expression[p]) === 'object' && expression[p]['token'] === 'var') {
 			object = expression[p];
-			if(context.varsMap[expression] == null) {
+			if(context.varsMap[expression] == null && context.nodes) {
 			    context.varsMap[expression] = true;
+			    context.variables.push(object);
+			} else if(context.varsMap[object.value] == null && !context.nodes) {
+			    context.varsMap[expression] = true;
+			    context.varsMap[object.value] = true;
 			    context.variables.push(object);
 			}
 			var quad = {'subject':subject, 'predicate':predicate, 'object':object};
@@ -9125,7 +9133,15 @@ MicrographQL.literalToJS = function(object) {
 	object = object.value;
     }
     return object;
-}
+};
+
+MicrographQL.uriToJS = function(object) {
+    if(object.value.indexOf(MicrographQL.base_uri) != -1) {
+	return {'$id': object.value.split(MicrographQL.base_uri)[1] }
+    } else {
+	return {'$id': object.value }
+    }
+};
 // end of ./src/micrograph/src/micrograph_ql.js 
 // imports
 
@@ -9213,6 +9229,29 @@ MicrographQuery.prototype.first = function(callback) {
     return this.store;
 };
 
+MicrographQuery.prototype.tuples = function(callback) {
+    this.kind = 'tuples';
+    var that = this;
+    this._executeQuery(function(results){
+	if(results) {
+	    for(var i=0; i<results.length; i++) {
+		var result = results[i];
+		for(var p in result) {
+		    if(result[p].token === 'literal') {
+			result[p] = MicrographQL.literalToJS(result[p]);
+		    } else {
+			result[p] = MicrographQL.uriToJS(result[p]);
+		    }
+		}
+	    }
+	    callback(results);
+	} else {
+	    callback(results);
+	}
+    });
+    return this.store;
+};
+
 MicrographQuery.prototype.remove = function(callback) {
     this.kind = 'remove';
     this.store.startGraphModification();
@@ -9248,7 +9287,6 @@ MicrographQuery.prototype._executeUpdate = function(callback) {
     this.topLevel = pattern.topLevel;
     this.subject = pattern.subject;
     this.inverseMap = pattern.inverseMap;
-    //console.log(sys.inspect(this.query, true, 20));
     this.store.execute(this.query,function(success, results){
 	if(callback)
 	    callback(success);
@@ -9358,9 +9396,20 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 	    } else {
 		if(that.onErrorCallback) {
 		    that.onError(results);
-		} else {
-		    that.callback(null);
 		}
+		that.callback(null);
+	    }
+	});
+    } else if(this.kind === 'tuples') {
+	//console.log(sys.inspect(this.query, true, 20));
+	this.store.execute(this.query, function(success, results) {
+	    if(success) {
+		callback(results);
+	    } else {
+		if(that.onErrorCallback) {
+		    that.onError(results);
+		}
+		that.callback(null);
 	    }
 	});
     }
@@ -9368,6 +9417,8 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 
 MicrographQuery.prototype._parseQuery = function(object) {
     var context = MicrographQL.newContext(true);
+    if(this.kind === 'tuples')
+	context.nodes = false;
     var result = MicrographQL.parseBGP(object, context, true);
     var subject = result[0];
 

@@ -62,18 +62,28 @@ Utils.remove = function(a,v) {
 
 Utils.repeat = function(c,max,floop,fend,env) {
     if(arguments.length===4) { env = {}; }
+    for(var i=c; i<max; i++) {
+	env._i=i;
+	floop(function(k,env) {
+
+	}, env);
+    }
+    fend(env);
+};
+
+Utils.repeatAsync = function(c,max,floop,fend,env) {
+    if(arguments.length===4) { env = {}; }
     if(c<max) {
         env._i = c;
         floop(function(floop,env){
             // avoid stack overflow
             // deadly hack
-            Utils.recur(function(){ Utils.repeat(c+1, max, floop, fend, env); });
+            Utils.recur(function(){ Utils.repeatAsync(c+1, max, floop, fend, env); });
         },env);
     } else {
         fend(env);
     }
 };
-
 
 Utils.meanwhile = function(c,floop,fend,env) {
     if(arguments.length===3) { env = {}; }
@@ -140,15 +150,7 @@ Utils.keys = function(obj) {
 };
 
 Utils.iso8601 = function(date) {
-    function pad(n){
-        return n<10 ? '0'+n : n;
-    }    
-    return date.getUTCFullYear()+'-'
-        + pad(date.getUTCMonth()+1)+'-'
-        + pad(date.getUTCDate())+'T'
-        + pad(date.getUTCHours())+':'
-        + pad(date.getUTCMinutes())+':'
-        + pad(date.getUTCSeconds())+'Z';
+    return date.getTime();
 };
 
 
@@ -203,30 +205,8 @@ Utils.parseStrictISO8601 = function (str) {
 
 
 Utils.parseISO8601 = function (str) {
-    var regexp = "([0-9]{4})(-([0-9]{2})(-([0-9]{2})" +
-        "(T([0-9]{2}):([0-9]{2})(:([0-9]{2})(\.([0-9]+))?)?" +
-        "(Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?";
-    var d = str.match(new RegExp(regexp));
+    return new Date(parseInt(str));
 
-    var offset = 0;
-    var date = new Date(d[1], 0, 1);
-
-    if (d[3]) { date.setMonth(d[3] - 1); }
-    if (d[5]) { date.setDate(d[5]);  }
-    if (d[7]) { date.setHours(d[7]);  }
-    if (d[8]) { date.setMinutes(d[8]);  }
-    if (d[10]) { date.setSeconds(d[10]);  }
-    if (d[12]) { date.setMilliseconds(Number("0." + d[12]) * 1000); }
-    if (d[14]) {
-        offset = (Number(d[16]) * 60) + Number(d[17]);
-        offset *= ((d[15] == '-') ? 1 : -1);
-    }
-
-    offset -= date.getTimezoneOffset();
-    var time = (Number(date) + (offset * 60 * 1000));
-    var toReturn = new Date();
-    toReturn.setTime(Number(time));
-    return toReturn;
 };
 
 Utils.parseISO8601Components = function (str) {
@@ -266,51 +246,7 @@ Utils.parseISO8601Components = function (str) {
 };
 
 Utils.compareDateComponents = function(stra,strb) {
-    var a = Utils.parseISO8601Components(stra);
-    var b = Utils.parseISO8601Components(strb);
-
-    if((a.timezone == null && b.timezone == null) ||
-       (a.timezone != null && b.timezone != null)) {        
-        var da = Utils.parseISO8601(stra);
-        var db = Utils.parseISO8601(strb);
-        
-        if(da.getTime() == db.getTime()) {
-            return 0;
-        } else if(da.getTime() < db.getTime()){
-            return -1;
-        } else {
-            return 1;
-        }
-    } else if (a.timezone != null && b.timezone == null){
-        da = Utils.parseISO8601(stra);
-        db = Utils.parseISO8601(strb);
-        var ta = da.getTime();
-        var tb = db.getTime();
-
-        var offset = 14*60*60;
-
-        if(ta < tb && ta < (tb + offset)) {
-            return -1;
-        } else if(ta > tb && ta > (tb - offset)) {
-            return 1;
-        } else {
-        return null;
-        }
-    } else {
-        da = Utils.parseISO8601(stra);
-        db = Utils.parseISO8601(strb);
-        ta = da.getTime();
-        tb = db.getTime();
-
-        var offset = 14*60*60;
-        if(ta < tb && (ta + offset)  < tb) {
-            return -1;
-        } else if(ta > tb && (ta + offset) > tb) {
-            return 1;
-        } else {
-        return null;
-        }
-    }
+    return stra == strb;
 };
 
 // RDF utils
