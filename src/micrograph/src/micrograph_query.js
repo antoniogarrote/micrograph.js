@@ -80,16 +80,16 @@ MicrographQuery.prototype.groupBy = function(groupPredicate) {
 MicrographQuery.prototype.order = function(order) {
     this.sortValue = order;
     return this;
-}
+};
 
 MicrographQuery.prototype.startNode = function(node) {
     this.template['$id'] = node['$id'];
-    this.startNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']))
+    this.startNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']));
     return this;
 };
 
 MicrographQuery.prototype.endNode = function(node) {
-    this.endNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']))
+    this.endNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']));
     for(var p in this.template) {
 	if(p != '$id') {
 	    this.template[p] = {'$id':node['$id']};
@@ -101,6 +101,9 @@ MicrographQuery.prototype.endNode = function(node) {
 
 
 MicrographQuery.prototype.all = function(callback) {
+    if(callback == null)
+	callback = function(){};
+
     if(this.kind === 'traverse')
 	this.kind = 'traverseAll';
     else
@@ -113,6 +116,43 @@ MicrographQuery.prototype.all = function(callback) {
     });
     return this.store;
 };
+
+MicrographQuery.prototype.instances = function(callback) {
+    if(callback == null)
+	callback = function(){};
+
+    var filter = this.filter;
+    this.filter = [];
+    var groupPredicate = this.groupPredicate;
+    this.groupPredicate = null;
+    var that = this;
+
+    this.all(function(results) {
+	if(results && results.constructor === Array) {
+	    for(var i=0; i<results.length; i++)
+		that.store.instantiate(results[i]);
+
+	    that.filter = filter;
+	    that.groupPredicate = groupPredicate;
+
+	    if(that.filter.length > 0) {
+		that._applyResultFilter(results, callback);
+	    } else {	
+		if(that.groupPredicate != null) 
+		    that._groupResults(results, callback);
+		else
+		    callback(results);
+	    }
+	} else if(results) {
+	    this.instantiate(results);
+	    callback(results);
+	} else {
+	    callback(null);
+	}
+    });
+    return this.store;
+};
+
 
 MicrographQuery.prototype.first = function(callback) {
     var that = this;
@@ -132,6 +172,9 @@ MicrographQuery.prototype.first = function(callback) {
 };
 
 MicrographQuery.prototype.tuples = function(callback) {
+    if(callback == null)
+	callback = function(){};
+
     this.kind = 'tuples';
     var that = this;
     this._executeQuery(function(results){
@@ -182,10 +225,10 @@ MicrographQuery.prototype.removeNodes = function(callback) {
 
 MicrographQuery.prototype.bind = function(callback) {
     var pattern = this._parseQuery(this.template);
-    this.store.bind(pattern,callback);
+    this.store.bind(pattern,this,callback);
 
     return this.store;
-}
+};
 
 // protected inner methods
 
@@ -347,7 +390,7 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 			result['start'] = MicrographQL.literalToJS(result['start']);
 		    }
 		    if(result['end'].token === 'uri') {
-			var id = result['end'].value;
+			id = result['end'].value;
 			if(nodes[id] == null) {
 			    that.store.execute(MicrographQL.singleNodeQuery(id, 'p', 'o'), function(success, resultsNode){
 				var node = nodes[id] || {};
@@ -497,10 +540,12 @@ MicrographQuery.prototype._parseModifyNodes = function(object, callback) {
 
 	    that.template = {'$id': result[i].$id};
 	    that.kind = 'removeNode';
-	    that._executeUpdate(function(result){
-		if(result===true)
+	    that._executeUpdate(function(updateResult){
+		if(updateResult===true)
 		    counter++;
-		that._unlinkNode(that.template['$id'])
+		that._unlinkNode(that.template['$id']);
+		if(that.store.nodeDeletedCallback)
+		    that.store.nodeDeletedCallback(result[i]);
 	    });
 	};
     });
@@ -533,7 +578,7 @@ MicrographQuery.prototype._unlinkNode = function(id,cb,excludeIncoming){
 	    cb(true);
 	}
     });
-}
+};
 
 MicrographQuery.prototype._modifyQuery = function(quads) {
 
@@ -619,16 +664,23 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 
 	    var invLinks = inverseMap[id] || inverseMap[p];
 	    if(invLinks) {
+		debugger;
 		for(var linkedProp in invLinks) {
-		    if(invLinks[linkedProp].length === 1) {
-			var linkedObjId = results[i][varsMap[invLinks[linkedProp][0]]];
+		    nodeDisambiguations  = disambiguations[node['$id']] || {};
+		    disambiguations[node.id] = nodeDisambiguations;
+		    var invDisambiguations = nodeDisambiguations[linkedProp+"$in"] ||{};
+		    nodeDisambiguations[linkedProp+"$in"] = invDisambiguations;
+
+		    for(var j=0; j<invLinks[linkedProp].length; j++) {
+
+			var linkedObjId = results[i][varsMap[invLinks[linkedProp][j]]];
 			if(linkedObjId != null) {
 			    // this is a variable resolved to a URI in the bindings results
 			    linkedObjId = linkedObjId.value;
 			    if(linkedObjId.indexOf(MicrographQL.base_uri) != -1)
 			       linkedObjId = linkedObjId.split(MicrographQL.base_uri)[1];
 			} else {
-			    linkedObjId = invLinks[linkedProp][0];
+			    linkedObjId = invLinks[linkedProp][j];
 			}
 
 			var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
@@ -638,26 +690,21 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 			delete linkedNode[linkedProp];
 
 			nodes[linkedObjId] = linkedNode;
+
 			if(node[linkedProp+"$in"] == null) {
 			    node[linkedProp+"$in"] = linkedNode;
+			    invDisambiguations[linkedNode['$id']] = true;
+			    
 			} else if(node[linkedProp+"$in"].constructor === Array) {
-			    node[linkedProp+"$in"].push(linkedNode);
+			    if(invDisambiguations[linkedNode['$id']] !== true) {
+				node[linkedProp+"$in"].push(linkedNode);
+				invDisambiguations[linkedNode['$id']] = true
+			    }
 			} else {
-			    node[linkedProp+"$in"] = [node[linkedProp+"$in"], linkedNode];
-			}
-		    } else {
-			node[linkedProp+"$in"] = [];
-			for(var i=0; i< invLinks[linkedProp].length; i++) {
-
-			    var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
-			    var toIgnore = ignore[linkedObjId] || {};					  
-			    ignore[linkedObjId] = toIgnore;
-			    toIgnore[linkedProp] = true;
-			    delete linkedNode[linkedProp];
-
-			    var linkedObjId = varsMap[invLinks[linkedProp][0]] || invLinks[linkedProp][0];
-			    var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
-			    nodes[linkedObjId].push(linkedNode);
+			    if(invDisambiguations[linkedNode['$id']] !== true) {			    
+				node[linkedProp+"$in"] = [node[linkedProp+"$in"], linkedNode];
+				invDisambiguations[linkedNode['$id']] = true
+			    }
 			}
 		    }
 		}

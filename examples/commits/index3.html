@@ -1,0 +1,176 @@
+<!doctype html>
+
+<!--[if lt IE 7 ]>
+    <html class="no-js ie6" lang="en"> <![endif]-->
+<!--[if IE 7 ]>
+    <html class="no-js ie7" lang="en"> <![endif]-->
+<!--[if IE 8 ]>
+    <html class="no-js ie8" lang="en"> <![endif]-->
+<!--[if (gte IE 9)|!(IE)]><!-->
+<html class="no-js" lang="en"> <!--<![endif]-->
+
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Example 1</title>
+    <meta name="author" content="Antonio Garrote">
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="./js/d3.v2.js"></script>
+    <script type="text/javascript" src="./js/ko.js"></script>
+    <script type="text/javascript" src="./js/micrograph.js"></script>
+
+    <script type="text/javascript">
+    window.onload = function() {
+	var load = function(user,project) {	    
+	    $('#graph-chart').empty();
+
+	    
+
+            mg.create(function(g) {
+		window['g'] = g;
+		g.define('Person', {
+		     numberCommits: function() { 
+			 return (this.author$in.length ? this.author$in.length : 1);
+		     },
+		     setScale: function(committersInGroup, availableSpace) {
+			 this._xscale = d3.scale.linear().domain([0,committersInGroup]).range([0, availableSpace]);
+		     },
+		     scale: function(v) { return this._xscale(v) }
+		 })
+		 .from("https://api.github.com/repos/"+user+"/"+project+"/commits?callback=loadCommits&per_page=100")
+		 .transform({
+		     "null":{"@delete":"meta"},
+		     "data":{"@id": "url",
+			     "@type": function(){ return "Commit" },
+			     "message": "@delete",
+			     "tree": "@delete",
+			     "date": function(o) { console.log(""+o.commit.author.date); return d3.time.format.iso.parse(o.commit.author.date.split("T")[0]).getTime() },
+			     "@delete": "commit" },
+		     "committer": "@delete",
+		     "author": { "@id": "url", "@type": function(){ return "Person" }},
+		     "parents": "@delete"
+		 })
+	         .load(function() {
+		     var groups = {}, days = [], max, pys = {};
+		     var color = d3.scale.category10();
+
+		     g.where({$type: "Commit", author:{}})
+		      .select(function(c){ return c.date != null && c.author != null })
+                      .groupBy(function(c){ return c.date })
+                      .all(function(commits){ 
+			 for(var d in commits) {
+			     if(max == null || commits[d].length > max)
+				 max = commits[d].length;
+			     d = parseInt(d);
+			     days.push(d);
+
+			     g.where({ $type:"Person",  author$in:{ date:d } })
+			      .instances(function(acum){  
+				  groups[d] = acum;
+			      })
+			 }
+			 days = days.sort().reverse();
+		     });
+
+		     var w = 1200;
+		     var h = 1200;
+
+		     var vis = d3.select("#graph-chart").append("svg:svg")
+			 .attr("width",w)
+			 .attr("height",h);		     
+
+		     var bars = vis.selectAll(".day")
+			 .data(days)
+			 .enter().append("g");
+
+		     var rowHeight = 50;
+		     var dateOffset = 100;
+		     var dateLabelWidth = 100;
+		     var pictureWidth = 50;
+		     var nameWidth = 80;
+
+		     bars.append("text")
+			 .attr("x",1)
+			 .attr("y", function(d,i) { pys[d] = i*rowHeight; return i*rowHeight + 10; })
+			 .attr("font-size", 10)
+		         .text(function(d) { return d3.time.format("%Y-%m-%d")(new Date(parseInt(d))); })
+			 .style("fill", "#000000")
+			 .style("stroke", "none");
+
+		     var committers = bars.selectAll(".committers")
+			 .data(function(day){ 
+			     var barsSpace = w - dateLabelWidth - (groups[day].length*(pictureWidth+nameWidth))
+			     var upto = 0
+			     for(var i=0; i<groups[day].length; i++) {
+				 var committer = groups[day][i];
+				 committer.setScale(max, barsSpace);
+				 committer.y = pys[day];
+				 committer.upto = upto;
+
+				 upto = upto+groups[day][i].numberCommits();
+			     }
+			     return groups[day] })
+			 .enter().append("g")
+
+		     committers.append("svg:rect")
+			 .attr("y", function(d){ return d.y })
+			 .attr("x", function(d,i){ 
+			     return d.scale(d.upto) + (pictureWidth+nameWidth)*i + dateOffset ;
+			 })
+			 .attr("width", function(d){ return d.scale(d.numberCommits()) + (pictureWidth+nameWidth) })
+			 .attr("height",rowHeight-10)
+			 .attr("fill", function(d){ return color(d.login) });
+
+		     committers.append("image")
+			 .attr("width", "32")
+			 .attr("height", "32")
+			 .attr("y",function(d){ return d.y+4 })
+			 .attr("x", function(d,i) { return d.scale(d.upto) + (pictureWidth+nameWidth)*i + dateOffset + 4 })
+			 .attr("xlink:href", function(d){ return d.avatar_url; })
+
+		     committers.append("text")
+			 .attr("x", function(d,i) { return d.scale(d.upto) + dateOffset + (pictureWidth+nameWidth)*i + 40 })
+			 .attr("y", function(d){ return d.y + 14 })
+			 .attr("font-size", 10)
+			 .text(function(d) { return d.login })
+			 .style("fill", "#ffffff")
+			 .style("stroke", "none");
+		 });
+	    });
+
+	};
+
+	var viewModel = {
+	    user: ko.observable('rails'),
+	    repo: ko.observable('rails')
+	};
+
+	viewModel.compute = function() {
+	    load(this.user(), this.repo());
+	};
+
+	ko.applyBindings(viewModel);
+	    
+	load('rails','rails');
+    };
+    </script>
+  </head>
+
+  <body>
+    <p>
+      <label>User:</label>
+      <input data-bind="value:user"></input>
+    </p>
+    <p>
+      <label>Repo:</label>
+      <input data-bind="value:repo"></input>
+    </p>
+    <p>
+      <input type='button' value='compute' data-bind='click:compute'></input>
+    </p>
+
+    <div id='graph-chart' style="text-align:center"></div>
+  </body>
+
+</html>

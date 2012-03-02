@@ -65,7 +65,8 @@ Callbacks.CallbacksBackend.prototype.startGraphModification = function() {
 };
 
 Callbacks.CallbacksBackend.prototype.nextGraphModification = function(event, quad) {
-    this.updateInProgress[event].push(quad);
+    if(this.updateInProgress)
+	this.updateInProgress[event].push(quad);
 };
 
 Callbacks.CallbacksBackend.prototype.endGraphModification = function(callback) {

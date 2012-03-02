@@ -146,7 +146,7 @@ this.micrograph_suite.testJSONP2 = function(test) {
 			test.ok(commit.parents.parents != null);
 			test.ok(commit.parents.parents.committer.login != null);
 		    }).
-		    all().
+		    all(function(commits) {}).
 		    where({$type: 'Repo'}).
 		    all(function(repos) {
 			test.ok(repos!=null);

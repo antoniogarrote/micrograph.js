@@ -833,14 +833,16 @@ exports.update1 = function(test) {
 	    where({name: 'Bertrand'}).
 	    first(function(russell) {
 		russell.profession = 'logician';
-		g.update(russell, function(res) {
+		g.updateNode(russell, function(res) {
 		    test.ok(res);
 		});
 	    }).
 	    where({profession: 'logician'}).
 	    all(function(logicians){
-		test.ok(logicians.length === 1);
+		test.ok(logicians.length === 1);		
 		test.ok(logicians[0].surname === 'Russell');
+		// modified but not loaded so it must remain as 'created'
+		test.ok(logicians[0].$state === 'created');
 		test.done();
 	    });
     });
@@ -857,7 +859,7 @@ exports.update2 = function(test) {
 	    where({surname: 'Russell'}).
 	    first(function(russell) {
 		russell.name = 'Bertrando';
-		g.update(russell, function(res) {
+		g.updateNode(russell, function(res) {
 		    test.ok(res);
 		});
 	    }).
@@ -865,11 +867,11 @@ exports.update2 = function(test) {
 	    all(function(logicians){
 		test.ok(logicians.length === 1);
 		test.ok(logicians[0].name === 'Bertrando');
+		test.ok(logicians[0].$state === 'created');
 		test.done();
 	    });
     });
 };
-
 
 exports.update3 = function(test) {
     mg.create(function(g) {
@@ -882,8 +884,8 @@ exports.update3 = function(test) {
 	    where({surname: 'Russell'}).
 	    first(function(russell) {
 		russell.name = 'Bertrando';
-		russell.country = {'name': 'Britain'}
-		g.update(russell, function(res) {
+		russell.country = {'name': 'Britain'};
+		g.updateNode(russell, function(res) {
 		    test.ok(res);
 		});
 	    }).
@@ -891,11 +893,13 @@ exports.update3 = function(test) {
 	    all(function(logicians){
 		test.ok(logicians.length === 1);
 		test.ok(logicians[0].name === 'Bertrando');
+		test.ok(logicians[0].country.$id != null);
 		test.ok(logicians[0].country.name === 'Britain');
 		test.done();
 	    });
     });
 };
+
 
 exports.update4 = function(test) {
     mg.create(function(g) {
@@ -911,7 +915,7 @@ exports.update4 = function(test) {
 	    first(function(russell) {
 		russell.name = 'Bertrando';
 		russell.livedIn = [russell.livedIn, {'name': 'United States', $type:'Country'}];
-		g.update(russell, function(res) {
+		g.updateNode(russell, function(res) {
 		    test.ok(res);
 		});
 	    }).
@@ -920,6 +924,110 @@ exports.update4 = function(test) {
 		test.ok(logicians.length === 1);
 		test.ok(logicians[0].name === 'Bertrando');
 		test.ok(logicians[0].livedIn.length === 2);
+		test.done();
+	    });
+    });
+};
+
+
+exports.update5 = function(test) {
+    mg.create(function(g) {
+	g.load([{$type: 'Person',
+	         name: 'Bertrand',
+	         surname: 'Russell',
+		 livedIn:{name:'Great Britain', $type:'Country'}},
+		{$type: 'Person',
+	         name: 'Niels',
+		 surname: 'Bohr',
+		 livedIn:{name:'Denmark', $type: 'Country'}}]).
+	    where({surname: 'Russell', livedIn:{}}).
+	    first(function(russell) {
+		russell.name = 'Bertrando';
+		russell.livedIn = [{'name': 'United States', $type:'Country'}];
+		g.updateNode(russell, function(res) {
+		    test.ok(res);
+		});
+	    }).
+	    where({surname: 'Russell', livedIn:{}}).
+	    all(function(logicians){
+		test.ok(logicians.length === 1);
+		test.ok(logicians[0].name === 'Bertrando');
+		test.ok(logicians[0].livedIn.length == null); // no longer an array, now only the USA
+		test.ok(logicians[0].livedIn.name === 'United States');
+		test.done();
+	    });
+    });
+};
+
+
+exports.update6 = function(test) {
+    mg.create(function(g) {
+	g.load([{name:'Great Britain',
+		 $type: 'Country',
+		 inhabitants: {$type: 'Person',
+			       name: 'Bertrand',
+			       surname: 'Russell'}},
+		{name: 'Denmark',
+		 $type: 'Country',
+		 inhabitants:  {$type: 'Person',
+				name: 'Niels',
+				surname: 'Bohr'}}]).
+	    where({surname: 'Russell', inhabitants$in:{}}).
+	    first(function(russell) {
+		russell.name = 'Bertrando';
+		delete russell['inhabitants$in'];
+		g.updateNode(russell, function(res) {
+		    test.ok(res);
+		});
+	    }).
+	    where({surname: 'Russell', inhabitants$in:{}}).
+	    all(function(logicians){
+		test.ok(logicians.length === 1);
+		test.ok(logicians[0].name === 'Bertrando');
+		// this should not be modified since we are not passing the 
+		// suitable parameter to the update function
+		test.ok(logicians[0].inhabitants$in.name == "Great Britain");
+		test.done();
+	    });
+    });
+};
+
+exports.update7 = function(test) {
+    mg.create(function(g) {
+	g.load([{name:'Great Britain',
+		 $type: 'Country',
+		 inhabitants: {$type: 'Person',
+			       name: 'Bertrand',
+			       surname: 'Russell'}},
+		{name: 'Denmark',
+		 $type: 'Country',
+		 inhabitants:  {$type: 'Person',
+				name: 'Niels',
+				surname: 'Bohr'}}]).
+	    where({surname: 'Russell', inhabitants$in:{}}).
+	    first(function(russell) {
+		russell.name = 'Bertrando';
+		russell.inhabitants$in = [{'name': 'United States', $type:'Country'}];
+		g.updateNode(russell, true, function(res) {
+		    test.ok(res);
+		});
+	    }).
+	    where({surname: 'Russell', inhabitants$in:{}}).
+	    all(function(logicians){
+		test.ok(logicians.length === 1);
+		test.ok(logicians[0].name === 'Bertrando');
+		// this should have changed now, we are passing the $in flag
+		test.ok(logicians[0].inhabitants$in.name == "United States");
+	    }).
+	    where({name: 'Great Britain'}).
+	    all(function(countries) {
+		test.ok(countries.length === 1);
+		test.ok(countries[0].inhabitants == null);
+	    }).
+	    where({name: 'United States', inhabitants:{}}).
+	    all(function(countries) {
+		test.ok(countries.length === 1);
+		test.ok(countries[0].inhabitants.surname === 'Russell');
 		test.done();
 	    });
     });
@@ -1011,7 +1119,7 @@ exports.bind2b = function(test) {
 	    g.where({name: 'Niels'}).
 		first(function(nb){
 		    nb['profession'] = 'phisicist';
-		    g.update(nb);
+		    g.updateNode(nb);
 		}).
 		save({name: 'Wolfgang',
 		      surname: 'Pauli',
@@ -1068,20 +1176,20 @@ exports.instantiate1 = function(test) {
 	           name: 'Niels',
 		   surname: 'Bohr'}]).
 	    where({$type: 'Person'}).
-	    all().instances(function(people){
+	    instances(function(people){
 		test.ok(people.length === 2);
 		for(var i=0; i<people.length; i++) {
 		    test.ok(people[i].nationality() === 'apatride');
 		}
 	    }).
 	    where({$type: 'Philosopher'}).
-	    all().instances(function(philosophers){
+	    instances(function(philosophers){
 		test.ok(philosophers[0].__lastType === 'undefinedPersonPhilosopher');
 		test.ok(philosophers.length === 1);
 		test.ok(philosophers[0].likesPhilosophy);
 	    }).
 	    where({$type: 'Phisicist'}).
-	    all().instances(function(phisicists){
+	    instances(function(phisicists){
 		test.ok(phisicists.length === 1);
 		test.ok(!phisicists[0].likesPhilosophy);
 		test.done();
@@ -1296,7 +1404,7 @@ exports.paths3 = function(test) {
 					   parent: {$type: 'Node',
 						    name: 'e'}}}}},
 		{$type: 'Other', name: 'foo'}]).
-	    traverse("parent*/name").
+	    traverse("parent*/name"). //IS HERE
 	    all(function(results) {
 		test.ok(results.length === 16);
 		var acum = {};
@@ -1503,6 +1611,35 @@ exports.testGroupBy = function(test) {
 		test.ok(groups['2'].length === 1);
 		test.ok(groups['3'].length === 2);
 		test.done();
+	    });
+    });
+};
+
+exports.testSetState = function(test) {
+    mg.create(function(g) {
+	g.load([{f:{a:1, b:2}, ff:true},
+	        {a:2, b:4},
+	        {a:3, b:5},
+	        {a:3, b:6}]).
+	    where({a:1}).
+	    first(function(a){
+		g.setState(a,"hey");
+	    }).
+	    where({a:1}).
+	    first(function(a) {
+		g.setId(a,'http://test.com/hey');
+
+		g.where({a:1}).
+		    first(function(a) {
+			test.ok(a.$id === 'http://test.com/hey');
+			test.ok(a.$state === "hey");
+		    }).
+		    where({ff:true}).
+		    first(function(f) {
+			test.ok(f.f.$id==='http://test.com/hey');
+			test.done();
+		    });
+		
 	    });
     });
 };

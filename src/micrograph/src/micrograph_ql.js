@@ -20,7 +20,7 @@ Utils.normalizeUnicodeLiterals = function(toNormalize) {
 // QL
 MicrographQL.base_uri = "http://rdfstore-js.org/micrographql/graph#";
 MicrographQL.prefix = "mql";
-MicrographQL.NIL = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil"
+MicrographQL.NIL = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil";
 
 MicrographQL.counter = 0;
 
@@ -115,8 +115,8 @@ MicrographQL.parseFilter = function(predicate, filterVariable, expression) {
 	if(typeof(value) !== 'object' || value.constructor !== Array) {
 	    value = [value];
 	}
-	var acum = [];
-	for(var i=0; i<value.length; i++) {
+	acum = [];
+	for(i=0; i<value.length; i++) {
 	    acum.push(MicrographQL.parseFilter(predicate, filterVariable, value[i]));
 	}
 	return {"token": "expression",
@@ -264,8 +264,11 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 
 	if(expression['$from'] == null && from != null)
 	    expression['$from'] = from;
-	if(expression['$state'] == null && state != null)
+
+	if(expression['$state'] == null && (state === 'created' || state === 'loaded')) 
 	    expression['$state'] = state;
+	else if(expression['$state'] == null && state === 'dirty') 
+	    expression['$state'] = 'created';
 	else if(expression['$state'] === 'loaded' && state === 'dirty') 
 	    expression['$state'] = 'dirty';
 
@@ -308,22 +311,32 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 			idInverseMap = invLinkedId.value;
 		    }
 
-		    linked[linkedProp] = {'$id':invLinkedId};
-
-		    result = MicrographQL.parseBGP(linked, context, false, graph, from, state);
-
-		    inverseLinks = context.inverseMap[idInverseMap] || {};
-		    context.inverseMap[idInverseMap] = inverseLinks;
-
-		    linked = inverseLinks[linkedProp] || [];
-		    inverseLinks[linkedProp] = linked;
-		    if(result[0].token === 'uri') {
-			linked.push(result[0].value.split(MicrographQL.base_uri)[1]);
+		    var linkedArray;
+		    if(linked.constructor !== Array) {
+			linkedArray = [linked];
 		    } else {
-			linked.push(result[0].value);
+			linkedArray = linked;
 		    }
 
-		    context.quads = context.quads.concat(result[1]);
+		    for(var i=0; i<linkedArray.length; i++) {
+			linked = linkedArray[i];
+			linked[linkedProp] = {'$id':invLinkedId};
+
+			result = MicrographQL.parseBGP(linked, context, false, graph, from, state);
+
+			inverseLinks = context.inverseMap[idInverseMap] || {};
+			context.inverseMap[idInverseMap] = inverseLinks;
+			
+			linked = inverseLinks[linkedProp] || [];
+			inverseLinks[linkedProp] = linked;
+			if(result[0].token === 'uri') {
+			    linked.push(result[0].value.split(MicrographQL.base_uri)[1]);
+			} else {
+			    linked.push(result[0].value);
+			}
+
+			context.quads = context.quads.concat(result[1]);
+		    }
 		} else {
 		    
 		    var predicateUri = p;

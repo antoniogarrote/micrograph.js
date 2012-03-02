@@ -70,9 +70,10 @@ MicrographClass.check = function(resource) {
 MicrographClass.isInstance = function(resource, klass) {
     if(klass.indexOf("and(") === 0) {
         var parts = klass.slice(0,klass.length-1).split("and(")[1].split(",");
-            if(!MicrographClass.isInstance(resource, parts[i])) {
+	for(var i=0; i<parts.length; i++) {
+            if(!MicrographClass.isInstance(resource, parts[i]))
                 return false;
-            }
+	}
         return true;
     } else if(klass.indexOf("or(") === 0) {
         var parts = klass.slice(0,klass.length-1).split("or(")[1].split(",");
