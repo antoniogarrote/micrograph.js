@@ -706,6 +706,64 @@ for(var i=0; i<10; i++) {\n\
     }, i*2*1000);\n\
 }',
 	data: queryExampleData1
+    },
+
+    ex27: {
+	source:
+'g.from("http://anyorigin.com/get?url=http%3A//www.imdb.com/title/tt0264235/",\n\
+        {jsonp:true,\n\
+         media:"microdata",\n\
+         result:"contents",\n\
+         base:"http://www.imdb.com/title/tt026423"})\n\
+ .load(function() {\n\
+\n\
+    g.where({$type: "http://schema.org/TVSeries",\n\
+             genre: g._("genre"),\n\
+             name: g._("name")})\n\
+     .tuples(function(res){\n\
+         output(res);\n\
+     });\n\
+\n\
+})',
+	data: true
+    },
+
+    ex28: {
+	source:
+'g.from("http://dbpedia.org/data/Barcelona.n3", \n\
+       {media: "n3",\n\
+        lang: "en",\n\
+        ns: {dbont: "http://dbpedia.org/ontology/",\n\
+             dbprop: "http://dbpedia.org/property/"}})\n\
+ .onError(function() {\n\
+    output("Error loading data from DBPedia, is DBPedia down?");\n\
+ })\n\
+ .load(function() {\n\
+\n\
+     g.where({"foaf:name":"Barcelona"})\n\
+      .all(function(data) {\n\
+           output(data)\n\
+      })\n\
+\n\
+});',
+	data:true
+    },
+
+    ex29: {
+	source:
+'g.from("https://graph.facebook.com/platform", \n\
+       {media: "n3",\n\
+        compactProperties: true})\n\
+ .load(function() {\n\
+\n\
+   g.where({name: g._("name"),\n\
+            founded: g._("founded")})\n\
+    .tuples(function(data) {\n\
+         output(data);\n\
+    })\n\
+\n\
+});',
+	data:true
     }
 
 }
