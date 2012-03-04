@@ -4,11 +4,14 @@ body {
 
 /* ---------------- */
 
-.tabs-options li {
-    float: left;
-    padding: 10px;
-    list-style: none;
+.tabs-options {
+    margin-top: 20px;
     margin-bottom: 10px
+}
+
+.tabs-options span {
+    padding: 10px;
+    margin-bottom: 10px;
 }
 
 .example {
