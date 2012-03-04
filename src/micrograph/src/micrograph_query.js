@@ -836,7 +836,7 @@ MicrographQuery._processSingleNodeResults = function(id, resultsNode, node, disa
 		    nodeDisambiguations[pred] = {};
 		    nodeDisambiguations[pred][node[pred]] = true;
 
-		    if(obj['$id'] == null) {
+		    if(obj['$id'] != null) {
 			nodeDisambiguations[pred][obj['$id']] = true;						    
 		    } else {
 			nodeDisambiguations[pred]['date:'+obj.getTime()] = true;						    

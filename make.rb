@@ -39,6 +39,18 @@ def minimize_output_browser
   `cp ./dist/browser/micrograph*.js ./browsertests/workers/resources/public/`
 end
 
+def minimize_output_n3
+  puts "*** minimizing n3"
+  `cp ./closure-compiler.jar ./dist/browser/`
+  `cp ./src/micrograph/src/n3.js ./dist/browser/`
+#  `cd ./dist/browser && java -jar closure-compiler.jar --compilation_level=ADVANCED_OPTIMIZATIONS --js=micrograph.js > micrograph_min.js`
+  `cd ./dist/browser && java -jar closure-compiler.jar --compilation_level=SIMPLE_OPTIMIZATIONS --js=n3.js > n3_min.js`
+  `cp ./dist/browser/n3_min.js ./dist/browser/n3_min.js.bak`
+  `cd ./dist/browser && gzip -9 n3_min.js`
+  `mv ./dist/browser/n3_min.js.bak ./dist/browser/n3_min.js`
+  `rm ./dist/browser/closure-compiler.jar`
+end
+
 def minimize_output_browser_persistent
   puts "*** minimizing output"
   `cp ./closure-compiler.jar ./dist/browser_persistent/`
@@ -219,6 +231,7 @@ def make_browser
   build_distribution_directory 'browser'
   process_files_for_browser
   minimize_output_browser
+  minimize_output_n3
   puts "\r\n*** FINISHED";
 end
 

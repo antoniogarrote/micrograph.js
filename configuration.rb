@@ -19,7 +19,7 @@ BUILD_CONFIGURATION = {
                  "./src/js-query-engine/src/query_plan_sync_dpsize.js",
                  "./src/js-query-engine/src/query_engine.js",
                  "./src/js-query-engine/src/callbacks.js",
-                 # "./src/js-connection/src/rdfstore_client.js",
+                 # "./src/micrograph/src/n3.js",
                  "./src/micrograph/src/micrograph_ql.js",
                  "./src/micrograph/src/micrograph_query.js",
                  "./src/micrograph/src/micrograph_class.js",

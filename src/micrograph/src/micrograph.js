@@ -20,6 +20,183 @@ try {
 }
 */
 
+// Microdata object
+Microdata = function(baseURI,source,tag) {
+    this.baseURI = baseURI;
+
+    if(source == null)
+	this.doc = document;
+    else
+	this.doc = source;
+
+    this.tag = tag;
+};
+
+Microdata.prototype._toArray = function(nodeList) {
+    var acum = [];
+    if(nodeList == null)
+	return acum;
+    for (var i = 0; i < nodeList.length; i++)
+	acum[i] = nodeList[i];
+    return acum;
+};
+
+
+Microdata.prototype._getElementsByAttribute = function(oElm, strTagName, strAttributeName, includeFirst)  {
+    arrElements = [oElm];
+    includeFirst = includeFirst || true;
+    var arrReturnElements = new Array();
+    var oCurrent;
+    var oAttribute;
+
+    while(arrElements.length>0) {
+        oCurrent = arrElements.shift();
+
+	if(oCurrent.nodeType === Node.ELEMENT_NODE &&
+	   oCurrent.tagName.toLowerCase() !== 'link' &&
+	   oCurrent.tagName.toLowerCase() !== 'iframe' &&
+	   oCurrent.tagName.toLowerCase() !== 'meta') {
+
+	    var childNodes = oCurrent.childNodes;
+	    var isItemScope = (oCurrent.getAttribute && oCurrent.getAttribute("itemscope") != null)
+	    var isItemProperty = (oCurrent.getAttribute && oCurrent.getAttribute("itemproperty") != null)
+
+            oAttribute = oCurrent.getAttribute && oCurrent.getAttribute(strAttributeName);
+	    if(strAttributeName === "itemscope") {
+		if(oAttribute != null) {
+		    if(oCurrent != oElm || includeFirst)
+			arrReturnElements.push(oCurrent);					    
+		} else if(childNodes) {
+		    arrElements = arrElements.concat(this._toArray(childNodes));
+		}
+	    } else if(strAttributeName === "itemprop") {
+		if(oAttribute != null && oCurrent != oElm) {
+		    arrReturnElements.push(oCurrent);
+		} else if(childNodes && !isItemScope || oCurrent == oElm){
+		    arrElements = arrElements.concat(this._toArray(childNodes));
+		}
+	    }  else {
+		if(oAttribute != null) {
+		    arrReturnElements.push(oCurrent);
+		} else if(childNodes && !isItemScope || oCurrent == oElm){
+		    arrElements = arrElements.concat(this._toArray(childNodes));
+		}
+	    }
+	}
+    }
+    return arrReturnElements;
+};
+
+
+
+Microdata.prototype.parse = function() {
+    var scopes;
+    var from = this.doc;
+
+    if(arguments.length == 1 || this.tag)
+	from = this.doc.getElementById(this.tag || arguments[0]);
+
+    scopes = this._getElementsByAttribute(from, "*", "itemscope", true);
+
+    var nodes = [];
+    for(var i=0; i<scopes.length; i++)
+	nodes.push(this._processNode(scopes[i]));
+
+    return nodes;
+};
+
+Microdata.prototype._parseType = function(elem, acum) {
+    var types = [];
+    var typesFound = this._getElementsByAttribute(elem, "*", "itemtype", true);
+    for(var i=0; i<typesFound.length; i++) {
+	types.push(typesFound[i].getAttribute("itemtype"));
+    }
+    if(types.length == 1) {
+	acum['$type'] = types[0];
+    } else if(typesFound.length>1) {
+	acum['$type'] = types;
+    }
+};
+
+Microdata.prototype._parseProperties = function(elem, acum) {
+
+    var propsFound = this._getElementsByAttribute(elem, "*", "itemprop", false);
+    for(var i=0; i<propsFound.length; i++) {
+	this._processProperty(acum, propsFound[i]);
+    }
+};
+
+Microdata.prototype._parseId = function(elem, acum) {
+    var propsFound = this._getElementsByAttribute(elem, "*", "itemid", true);
+    if(propsFound.length === 1)
+	acum['$id'] = propsFound[0].getAttribute("itemid");
+};
+
+Microdata.prototype._processProperty = function(acum, property) {
+    // section 2.4 microdata HTML5 spec
+    var name = property.getAttribute("itemprop");
+    var oldValue = acum[name];
+    var newValue = null;
+    var tag = property.tagName.toLowerCase();
+    var value;
+
+    if(property.getAttribute("itemscope") != null) {
+	// nested node
+	newValue = this._processNode(property);
+    } else if(tag === 'meta') {
+	newValue = property.content;
+    } else if(tag === 'audio' || tag === 'embed' || tag === 'iframe' || 
+	      tag === 'source' || tag === 'track' || tag === 'video' || tag === 'img') {
+	value = property.getAttribute("src");
+	if(value.indexOf(":") != -1)
+	    newValue = value;
+	else
+	    newValue = this.baseURI + value;
+    } else if(tag === 'a' || tag === 'area' || tag === 'link') {
+	value = property.getAttribute("href");
+	if(value.indexOf(":") != -1)
+	    newValue = value;
+	else
+	    newValue = this.baseURI + value;
+    } else if(tag === 'object') {
+	value = property.getAttribute("data");
+	if(value.indexOf(":") != -1)
+	    newValue = value;
+	else
+	    newValue = this.baseURI + value;
+    } else if(property.getAttribute("datetime") != null) {
+	// parse attr datetime
+	newValue = new Date(property.getAttribute("datetime"));
+    } else {
+	newValue = property.textContent;
+    }
+
+    if(oldValue == null) 
+	acum[name] = newValue;
+    else if(typeof(oldValue) === 'object' && oldValue.constructor === Array)
+	acum[name].push(newValue);
+    else
+	acum[name] = [oldValue, newValue];
+};
+
+Microdata.prototype._processNode = function(elem) {
+    var acum = {};
+    this._parseId(elem, acum);
+    if(elem.getAttribute && elem.getAttribute("itemref") != null) {
+	var ids = elem.getAttribute("itemref").split(/\s+/);
+	for(var i=0; i<ids.length; i++) {
+	    var id = ids[i];
+	    elem = this.doc.getElementById(id);
+	    this._parseType(elem, acum);
+	    this._parseProperties(elem, acum);
+	}
+    } else {
+	this._parseType(elem, acum);
+	this._parseProperties(elem, acum);
+    }
+    return acum;
+}
+
 // Store
 var Micrograph = function(options, callback) {
     if(!options['treeOrder'])
@@ -40,6 +217,7 @@ var Micrograph = function(options, callback) {
     this.defaultState = 'created';
     this.nodeDeletedCallback = null;
     this.nodeUpdatedCallback = null;
+    this.blank = 0;
 
     for(var i=0; i<Micrograph.vars.length; i++) {
 	this['_'+Micrograph.vars[i]] = this._(Micrograph.vars[i]);
@@ -97,7 +275,7 @@ var Micrograph = function(options, callback) {
 };
 exports.Micrograph = Micrograph;
 
-Micrograph.VERSION = "0.4.0";
+Micrograph.VERSION = "0.4.3";
 
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
@@ -471,7 +649,7 @@ Micrograph.prototype.load = function() {
 		    that.load(data,callback);
 		}, this.errorCallback, options['jsonp'], options);
 	    } else {
-		Micrograph.ajax('GET', options['uri'], null, function(data){
+		Micrograph.ajax('GET', options['uri'], options, null, function(data){
 		    that.load(data,callback);
 		}, this.errorCallback);
 	    }
@@ -837,7 +1015,7 @@ Micrograph.prototype.from = function(uri, options, callback) {
 	    if(options['jsonp'] != null) {
 		Micrograph.jsonp(options['uri'], callback, this.errorCallback, options['jsonp'], options);
 	    } else {
-		Micrograph.ajax('GET', options['uri'], null, callback, this.errorCallback);
+		Micrograph.ajax('GET', options['uri'], options, null, callback, this.errorCallback);
 	    }
 	} else {
 	    this.lastDataToLoad = options;
@@ -897,7 +1075,14 @@ Micrograph.prototype.transform = function(f) {
     return this;
 };
 
-Micrograph.ajax = function(method, url, data, callback, errorCallback) {
+Micrograph.ajax = function(method, url, options, data, callback, errorCallback) {
+    var dataFormat = options['media'];
+    if(dataFormat == null || dataFormat === "json")
+	dataFormat = "application/json";
+    else if(dataFormat === "n3" ||  dataFormat === "turtle" || dataFormat === "ttl")
+	dataFormat = "text/n3";
+    else if(dataFormat === "microdata")
+	dataFormat = "text/html";
 
     var xhr = new XMLHttpRequest();
 
@@ -909,17 +1094,29 @@ Micrograph.ajax = function(method, url, data, callback, errorCallback) {
 	xhr.open(method, url, true);
     }
 
-    if (xhr.overrideMimeType) xhr.overrideMimeType("application/json");
-    if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", "application/json");
+    if (xhr.overrideMimeType) xhr.overrideMimeType(dataFormat);
+    if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", dataFormat);
 
     if(data != null && xhr.setRequestHeader)
-	xhr.setRequestHeader("Content-Type", "application/json");
+	xhr.setRequestHeader("Content-Type", dataFormat);
 
     xhr.onreadystatechange = function() {
 	if (xhr.readyState === 4) {
-	    if(xhr.status < 300 && xhr.status !== 0)
-		callback(JSON.parse(xhr.responseText), xhr);
-	    else
+	    if(xhr.status < 300 && xhr.status !== 0) {
+		var resultData;
+		if(dataFormat === "application/json")
+		    resultData = JSON.parse(xhr.responseText);
+		else if(dataFormat === "text/n3")
+		    resultData = Micrograph.n3(url, xhr.responseText, options);
+		else if(dataFormat === "text/html" && options['media'] === "microdata") {
+		    var tempDiv = document.createElement('div');
+		    tempDiv.innerHTML = xhr.responseText.replace(/<script(.|\s)*?\/script>/g, '');
+		    var md = new Microdata(url, tempDiv);
+		    resultData = md.parse();
+		}
+
+		callback(resultData, xhr);
+	    } else
 		errorCallback(xhr.statusText, xhr);
 	}
     };
@@ -931,9 +1128,32 @@ Micrograph.jsonpCallbackCounter = 0;
 Micrograph.jsonpRequestsConfirmations = {};
 Micrograph.jsonpRetries = {};
 
+Micrograph.prototype.microdata = function(from, data, options, cb) {
+    var tempDiv = document.createElement('div');
+    if(typeof(options) === "function")
+	cb = options;
+    tempDiv.innerHTML = data.replace(/<script(.|\s)*?\/script>/g, '');
+
+    var md = new Microdata(from, tempDiv);
+    var nodes = md.parse();
+
+    this.load(nodes, cb);
+
+    return this;
+};
+
+Micrograph.prototype.n3 = function(from, data, options, cb) {
+    if(Micrograph.n3)
+	this.load(Micrograph.n3(from, data, options), cb);
+    else
+	throw "N3 Parser not available";
+    return this;
+};
+
 Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, options, ignore) {
     ignore = ignore || false;
     options = options || {};
+    var baseURI = options['base'] || fragment;
     var maxRetries = options['retries'];
     if(maxRetries == null && maxRetries !== 0)
 	maxRetries = 1;
@@ -943,7 +1163,7 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
     var cbHandler = "jsonp"+Micrograph.jsonpCallbackCounter;
     Micrograph.jsonpCallbackCounter++;
 
-    if(callbackParameter == null)
+    if(callbackParameter == null || typeof(callbackParameter) !== "string")
 	callbackParameter = "callback";
 
     var uri = fragment;
@@ -965,8 +1185,23 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
 	Micrograph.jsonpRetries[fragment] = Micrograph.jsonpRetries[fragment]+1;
     }
     window[cbHandler] = function(data) {
-	Micrograph.jsonpRequestsConfirmations[uri] = true;
-	callback(data);
+	try {
+	    Micrograph.jsonpRequestsConfirmations[uri] = true;
+	    if(options['result'])
+		data = data[options['result']];
+	    if(options['media'] && options['media'] === 'n3') {
+		resultData = Micrograph.n3(baseURI, data, options);
+	    } else if(options['media'] && options['media'] === 'microdata') {
+		var tempDiv = document.createElement('div');
+		tempDiv.innerHTML = data.replace(/<script(.|\s)*?\/script>/g, '');
+		var md = new Microdata(baseURI, tempDiv);
+		data = md.parse();
+	    }
+	    callback(data);
+	}catch(e) {
+	    if(errorCallback)
+		errorCallback("Error processing JSONP results for media type  "+options['media']+": "+e);
+	}
     };
 
     setTimeout(function() {

@@ -356,7 +356,8 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 		    if(p === '$state')
 			predicateUri = MicrographQL.base_uri+"state";
 
-		    if(p.indexOf("/")!=-1 || 
+		    if(p.indexOf(":") === -1 &&
+		       p.indexOf("/")!== -1 || 
 		       p.indexOf("*") === p.length-1 || 
 		       p.indexOf("?") === p.length-1 ||
 		       p.indexOf("+") === p.length-1) {
