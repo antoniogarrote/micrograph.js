@@ -10482,7 +10482,7 @@ var Micrograph = function(options, callback) {
     },options['name']);
 };
 
-Micrograph.VERSION = "0.4.0";
+Micrograph.VERSION = "0.4.3";
 
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
@@ -11293,19 +11293,25 @@ Micrograph.ajax = function(method, url, options, data, callback, errorCallback) 
 
     var xhr = new XMLHttpRequest();
 
-    if (typeof XDomainRequest != "undefined") {
+    if (typeof XDomainRequest != "undefined" && !xhr["withCredentials"]) {
 	// XDomainRequest for IE.
 	xhr = new XDomainRequest();
 	xhr.open(method, url);
     } else {
 	xhr.open(method, url, true);
+
+	if (xhr.overrideMimeType) xhr.overrideMimeType(dataFormat);
+	if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", dataFormat);
+
+	if(data != null && xhr.setRequestHeader)
+	    xhr.setRequestHeader("Content-Type", dataFormat);
     }
 
-    if (xhr.overrideMimeType) xhr.overrideMimeType(dataFormat);
-    if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", dataFormat);
 
-    if(data != null && xhr.setRequestHeader)
-	xhr.setRequestHeader("Content-Type", dataFormat);
+    xhr.onerror = function(e) {
+	if(errorCallback)
+	    errorCallback("XHR Error", e);
+    };
 
     xhr.onreadystatechange = function() {
 	if (xhr.readyState === 4) {
@@ -11323,8 +11329,10 @@ Micrograph.ajax = function(method, url, options, data, callback, errorCallback) 
 		}
 
 		callback(resultData, xhr);
-	    } else
-		errorCallback(xhr.statusText, xhr);
+	    } else {
+		if(errorCallback)
+		    errorCallback(xhr.statusText, xhr);
+	    }
 	}
     };
 
