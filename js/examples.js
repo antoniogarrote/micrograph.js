@@ -302,7 +302,7 @@ g.load({testProp: date}, function() {\n\
     ex15: {
 	source:
 'g.where({$type: "Word",\n\
-         text: {$like: /f[ei]nestra/},\n\
+         text: {$like: "f[ei]nestra"},\n\
          length: {$and: [{$lteq: 9},\n\
                          {$gt: 7}]}})\n\
  .all(function(res){\n\
