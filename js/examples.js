@@ -751,7 +751,7 @@ for(var i=0; i<10; i++) {\n\
 
     ex29: {
 	source:
-'g.from("https://graph.facebook.com/platform", \n\
+'g.from("http://graph.facebook.com/platform", \n\
        {media: "n3",\n\
         compactProperties: true})\n\
  .load(function() {\n\
