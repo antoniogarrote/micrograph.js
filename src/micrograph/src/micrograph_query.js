@@ -12,6 +12,12 @@ try {
 */
 
 // Query object
+
+/**
+ * Creates a new MicrographQuery object modelling a data selection from the graph.
+ *
+ * @constructor
+ */
 exports.MicrographQuery = function(template) {
     this.template = template;
     this.lastResult = null;
@@ -20,74 +26,146 @@ exports.MicrographQuery = function(template) {
     this.startNodePath = null;
     this.endNodePath = null;
 };
-var MicrographQuery = exports.MicrographQuery;
 
+
+/**
+ * Sets the kind of query. Possible values are 'all', 'first', 'allTuples', etc.
+ *
+ * @param {String} [kind] The textual value of the kind of query.
+ */
 MicrographQuery.prototype.setKind = function(kind) {
     this.kind = kind;
     return this;
 };
 
+/**
+ * Sets the Micrograph object backing this query.
+ *
+ * @param {Micrograph} [store] The data graph instance.
+ */
 MicrographQuery.prototype.setStore = function(store) {
     this.store = store;
     return this;
 };
 
+/**
+ * Sets the callback function that will be invoked with the results of the query
+ * when executed.
+ *
+ * @param {Function} [callback] The callback function.
+ */
 MicrographQuery.prototype.setCallback = function(callback) {
     this.callback = callback;
     return this;
 };
 
+/**
+ * Iterates through a data selection discarding applying the provided function and discarding the output.
+ *
+ * @param {Function} [callback] The function to apply.
+ */
 MicrographQuery.prototype.each = function(callback) {
     this.filter.push(['each',callback]);
     return this;
 };
 
+/**
+ * Transforms a data selection applying the provided function
+ *
+ * @param {Function} [callback] The function to apply.
+ */
 MicrographQuery.prototype.map = function(callback) {
     this.filter.push(['map',callback]);
     return this;
 };
 
+/**
+ * Reduces the data selection of the function using the provided initial value for the acumulator and reduce function.
+ *
+ * @param {Object} [acum] Initial acumulator value.
+ * @param {Function} [callback] The function to apply. 
+ */
 MicrographQuery.prototype.reduce = function(acum,callback) {
     this.filter.push(['reduce',acum, callback]);
     return this;
 };
 
+/**
+ * Filter results from the data section using the provided function as a predicate.
+ *
+ * @param {Function} [callback] The function to apply.
+ */ 
 MicrographQuery.prototype.select = function(callback) {
     this.filter.push(['select',callback]);
     return this;
 };
 
+/**
+ * Sets a callback function that will be invoked everytime an exception is raised.
+ *
+ * @param {Function} [callback] The error callback.
+ */
 MicrographQuery.prototype.onError = function(callback) {
     this.onErrorCallback =  callback;
     return this;
 };
 
+/**
+ * Limits the data in the current data selection.
+ *
+ * @param {number} [limit] The maximum size of the selection.
+ */
 MicrographQuery.prototype.limit = function(limit) {
     this.limitValue = limit;
     return this;
 };
 
+/**
+ * Sets an offset in the current data selection.
+ *
+ * @param {number} [offset] number of items in the current selection to skip.
+ */
 MicrographQuery.prototype.offset = function(offset) {
     this.offsetValue = offset;
     return this;
 };
 
+/**
+ * Groups the data selection using a property name or a predicate function.
+ *
+ * @param {Object} [groupPredicate] String with a property name or function with a grouping predicate.
+ */
 MicrographQuery.prototype.groupBy = function(groupPredicate) {
     this.groupPredicate = (typeof(groupPredicate) === 'string' ? function(obj){ return obj[groupPredicate]; } : groupPredicate );
     return this;
 };
 
+/**
+ * Orders the current data selection using the provided property name or array of properties. The ascending or descending order for the sorting predicate can be expressed setting the property in an object with value 1 or -1.
+ *
+ * @param {Object} [order] Property string, object with direction order or array of order specifications.
+ */
 MicrographQuery.prototype.order = function(order) {
     this.sortValue = order;
     return this;
 };
 
+/**
+ * Sets the value of graph node with $id property as the starting point of a path expression.
+ *
+ * @param {Object} [node] Start node with $id property.
+ */
 MicrographQuery.prototype.startNode = function(node) {
     this.template['$id'] = node['$id'];
     this.startNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']));
     return this;
 };
 
+/**
+ * Sets the value of graph node with $id property as the end point of a path expression.
+ *
+ * @param {Object} [node] End node with $id property.
+ */
 MicrographQuery.prototype.endNode = function(node) {
     this.endNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']));
     for(var p in this.template) {
@@ -99,7 +177,11 @@ MicrographQuery.prototype.endNode = function(node) {
     return this;
 };
 
-
+/**
+ * Triggers the evaluation of the current data selection returning all the retrieved results.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
 MicrographQuery.prototype.all = function(callback) {
     if(callback == null)
 	callback = function(){};
@@ -117,6 +199,11 @@ MicrographQuery.prototype.all = function(callback) {
     return this.store;
 };
 
+/**
+ * Triggers the evaluation of the current data selection returning all the retrieved results as instances.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
 MicrographQuery.prototype.instances = function(callback) {
     if(callback == null)
 	callback = function(){};
@@ -153,7 +240,11 @@ MicrographQuery.prototype.instances = function(callback) {
     return this.store;
 };
 
-
+/**
+ * Triggers the evaluation of the current data selection returning the first result in the selection.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
 MicrographQuery.prototype.first = function(callback) {
     var that = this;
     this.all(function(res){
@@ -171,6 +262,11 @@ MicrographQuery.prototype.first = function(callback) {
     return this.store;
 };
 
+/**
+ * Triggers the evaluation of the current data selection returning all the retrieved tuples.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
 MicrographQuery.prototype.tuples = function(callback) {
     if(callback == null)
 	callback = function(){};
@@ -205,6 +301,11 @@ MicrographQuery.prototype.tuples = function(callback) {
     return this.store;
 };
 
+/**
+ * Removes the data assertions in the current data selection from the graph.
+ *
+ * @param {Function} [callback] Callback receiving the results.
+ */
 MicrographQuery.prototype.remove = function(callback) {
     this.kind = 'remove';
     this.store.startGraphModification();
@@ -213,7 +314,11 @@ MicrographQuery.prototype.remove = function(callback) {
     return this.store;
 };
 
-
+/**
+ * Removes the nodes in the current data selection from the graph.
+ *
+ * @param {Function} [callback] Callback receiving the results.
+ */
 MicrographQuery.prototype.removeNodes = function(callback) {
     this.kind = 'removeNodes';
     this.store.startGraphModification();
@@ -223,6 +328,11 @@ MicrographQuery.prototype.removeNodes = function(callback) {
 };
 
 
+/**
+ * Binds a function to the current selection.
+ *
+ * @param {Function} [callback] Callback receiving the results.
+ */
 MicrographQuery.prototype.bind = function(callback) {
     var pattern = this._parseQuery(this.template);
     this.store.bind(pattern,this,callback);
@@ -664,7 +774,6 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 
 	    var invLinks = inverseMap[id] || inverseMap[p];
 	    if(invLinks) {
-		debugger;
 		for(var linkedProp in invLinks) {
 		    nodeDisambiguations  = disambiguations[node['$id']] || {};
 		    disambiguations[node.id] = nodeDisambiguations;
@@ -711,7 +820,7 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 	    }
 
 	    if(processed[id] == null) {		
-		toIgnore = ignore[id] || {};
+		var toIgnore = ignore[id] || {};
 		ignore[id] = toIgnore;
 
 

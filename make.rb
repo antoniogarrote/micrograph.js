@@ -232,7 +232,6 @@ def make_browser
   process_files_for_browser
   minimize_output_browser
   minimize_output_n3
-  puts "\r\n*** FINISHED";
 end
 
 def make_browser_persistent
@@ -241,22 +240,11 @@ def make_browser_persistent
   build_distribution_directory 'browser_persistent'
   process_files_for_browser_persistent
   minimize_output_browser_persistent
-  puts "\r\n*** FINISHED";
+  puts "\r\n*** FINISHED"
 end
 
 
-
-if ARGV.length != 1
-  puts "USAGE make.rb [browser | browser_persistent | tests ]"
-else
-  if ARGV[0] == "browser"
-    make_browser
-  elsif ARGV[0] == "browser_persistent"
-    make_browser_persistent
-  elsif ARGV[0] == "tests"
-    exec "#{NODEUNIT} ./src/micrograph/test/*.js"
-  else
-    puts "Unknown configuration: #{ARGV[0]}"
-    puts "USAGE make.rb [ browser | browser_persistent | tests ]"
-  end
-end
+# build!
+make_browser
+`tar -cvf mg.tar.gz ./dist/browser/micrograph.js ./dist/browser/micrograph_min.js ./dist/browser/n3.js ./dist/browser/n3_min.js`
+puts "\r\n*** FINISHED"

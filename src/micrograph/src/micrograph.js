@@ -21,15 +21,21 @@ try {
 */
 
 // Microdata object
-Microdata = function(baseURI,source,tag) {
+
+/**
+ * Creates a new Microdata parser for the provided base URI and data source.
+ *
+ * @constructor
+ * @param {String} [baseURI] base URI of the document. It will be used to transform relative URIs into absolute URIs
+ * @param {DOMElement} [source] the DOM tree to be parsed.
+ */
+Microdata = function(baseURI,source) {
     this.baseURI = baseURI;
 
     if(source == null)
 	this.doc = document;
     else
 	this.doc = source;
-
-    this.tag = tag;
 };
 
 Microdata.prototype._toArray = function(nodeList) {
@@ -41,9 +47,15 @@ Microdata.prototype._toArray = function(nodeList) {
     return acum;
 };
 
-
-Microdata.prototype._getElementsByAttribute = function(oElm, strTagName, strAttributeName, includeFirst)  {
-    arrElements = [oElm];
+/**
+ * Get all elements with the requested attribute in the provided DOM element subtree
+ * 
+ * @param {DOMElement} [element] the DOM element at the top of the search tree.
+ * @param {String} [strAttributeName] name of the attribute to look for.
+ * @param {bool} [includeFirst] if set to true, the top element will also be returned if it defines the element. True by default.
+ */
+Microdata.prototype._getElementsByAttribute = function(element, strAttributeName, includeFirst)  {
+    arrElements = [element];
     includeFirst = includeFirst || true;
     var arrReturnElements = new Array();
     var oCurrent;
@@ -64,21 +76,21 @@ Microdata.prototype._getElementsByAttribute = function(oElm, strTagName, strAttr
             oAttribute = oCurrent.getAttribute && oCurrent.getAttribute(strAttributeName);
 	    if(strAttributeName === "itemscope") {
 		if(oAttribute != null) {
-		    if(oCurrent != oElm || includeFirst)
+		    if(oCurrent != element || includeFirst)
 			arrReturnElements.push(oCurrent);					    
 		} else if(childNodes) {
 		    arrElements = arrElements.concat(this._toArray(childNodes));
 		}
 	    } else if(strAttributeName === "itemprop") {
-		if(oAttribute != null && oCurrent != oElm) {
+		if(oAttribute != null && oCurrent != element) {
 		    arrReturnElements.push(oCurrent);
-		} else if(childNodes && !isItemScope || oCurrent == oElm){
+		} else if(childNodes && !isItemScope || oCurrent == element){
 		    arrElements = arrElements.concat(this._toArray(childNodes));
 		}
 	    }  else {
 		if(oAttribute != null) {
 		    arrReturnElements.push(oCurrent);
-		} else if(childNodes && !isItemScope || oCurrent == oElm){
+		} else if(childNodes && !isItemScope || oCurrent == element){
 		    arrElements = arrElements.concat(this._toArray(childNodes));
 		}
 	    }
@@ -88,7 +100,10 @@ Microdata.prototype._getElementsByAttribute = function(oElm, strTagName, strAttr
 };
 
 
-
+/**
+ * Performs the parsing of microdata in the document
+ * passed in the constructor function.
+ */
 Microdata.prototype.parse = function() {
     var scopes;
     var from = this.doc;
@@ -96,7 +111,7 @@ Microdata.prototype.parse = function() {
     if(arguments.length == 1 || this.tag)
 	from = this.doc.getElementById(this.tag || arguments[0]);
 
-    scopes = this._getElementsByAttribute(from, "*", "itemscope", true);
+    scopes = this._getElementsByAttribute(from, "itemscope", true);
 
     var nodes = [];
     for(var i=0; i<scopes.length; i++)
@@ -107,7 +122,7 @@ Microdata.prototype.parse = function() {
 
 Microdata.prototype._parseType = function(elem, acum) {
     var types = [];
-    var typesFound = this._getElementsByAttribute(elem, "*", "itemtype", true);
+    var typesFound = this._getElementsByAttribute(elem, "itemtype", true);
     for(var i=0; i<typesFound.length; i++) {
 	types.push(typesFound[i].getAttribute("itemtype"));
     }
@@ -120,14 +135,14 @@ Microdata.prototype._parseType = function(elem, acum) {
 
 Microdata.prototype._parseProperties = function(elem, acum) {
 
-    var propsFound = this._getElementsByAttribute(elem, "*", "itemprop", false);
+    var propsFound = this._getElementsByAttribute(elem, "itemprop", false);
     for(var i=0; i<propsFound.length; i++) {
 	this._processProperty(acum, propsFound[i]);
     }
 };
 
 Microdata.prototype._parseId = function(elem, acum) {
-    var propsFound = this._getElementsByAttribute(elem, "*", "itemid", true);
+    var propsFound = this._getElementsByAttribute(elem, "itemid", true);
     if(propsFound.length === 1)
 	acum['$id'] = propsFound[0].getAttribute("itemid");
 };
@@ -198,6 +213,22 @@ Microdata.prototype._processNode = function(elem) {
 }
 
 // Store
+
+/**
+ * Builds a new Micrograph object.<br/>
+ * <br/>
+ *
+ * @constructor
+ * @param {Object} [options]
+ * <ul>
+ *  <li> persistent:  should the store use persistence? </li>
+ *  <li> treeOrder: in versions of the store backed by the native indexing system, the order of the BTree indices</li>
+ *  <li> name: when using persistence, the name for this store. In the MongoDB backed version, name of the DB used by the store. By default <code>'rdfstore_js'</code> is used</li>
+ *  <li> overwrite: clears the persistent storage </li>
+ *  <li> maxCacheSize: if using persistence, maximum size of the index cache </li>
+ * </ul>
+ * @param {Function} [callback]  Callback function that will be invoked with the initialised instance of the store.
+ */
 var Micrograph = function(options, callback) {
     if(!options['treeOrder'])
         options['treeOrder'] = 15;
@@ -275,25 +306,52 @@ var Micrograph = function(options, callback) {
 };
 exports.Micrograph = Micrograph;
 
+/**
+ * Version of the library.
+ */
 Micrograph.VERSION = "0.4.3";
 
+/**
+ * Name for variables that will be automatically declared.
+ */
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
+/**
+ * Sets a callback error that will be invoked upon error.
+ *
+ * @param {Function} [cb] Error callback function.
+ */
 Micrograph.prototype.onError = function(cb) {
     this.errorCallback = cb;
     return this;
 };
 
+/**
+ * Sets a callback function that will be invoked every time the state of a node in the graph is modified
+ *
+ * @param {Function} [cb] Update callback function that will receive the new node state.
+ */
 Micrograph.prototype.onUpdate = function(cb) {
     this.nodeUpdatedCallback = cb;
     return this;
 };
 
+/**
+ * Sets a callback function that will be invoked every time the state of a node in the graph is deleted
+ *
+ * @param {Function} [cb] Update callback function that will receive the node deleted.
+ */
 Micrograph.prototype.onDelete = function(cb) {
     this.nodeDeletedCallback = cb;
     return this;
 };
 
+/**
+ * Creates a new non persistent Micrograph instance.
+ *
+ * @param {Object} [options] a hash of options for the graph constructor. See Micrograph function.
+ * @param {Function} [callback] optional callback function that will be invoked with the new graph instance.
+ */
 Micrograph.create = function() {
     var callback, options;
 
@@ -310,6 +368,14 @@ Micrograph.create = function() {
     new Micrograph(options, callback);
 };
 
+/**
+ * Creates a new persistent Micrograph instance.
+ *
+ * @param {String} [name] a name identifying the persistent graph.
+ * @param {bool} [overwrite] flag indicating if the data in the graph must be overwritten.
+ * @param {Object} [options] a hash of options for the graph constructor. See Micrograph function.
+ * @param {Function} [callback] optional callback function that will be invoked with the new graph instance.
+ */
 Micrograph.open = function(name,overwrite,options,callback) {
     if(!callback) {
 	if(typeof(options) === 'function') {
@@ -326,15 +392,23 @@ Micrograph.open = function(name,overwrite,options,callback) {
     new Micrograph(options, callback);
 };
 
+/**
+ * Defines a new class for the for the expression and prototype object passes as parameters.
+ *
+ * @param {String} [classExpression] a expression consisting of a $type name a property name using the syntax prop(), and the connectives: and, or, not.
+ * @params {Object} [object] prototype object with the functions and optional initialiser that will be added to all nodes in this class.
+ */
 Micrograph.prototype.define = function(classExpression, object) {
     MicrographClass.define(classExpression, object);
     return this;
 };
 
+/*
 Micrograph.prototype.resource = function(resource) {
     this.resources.push(resource);
     return this;
 };
+
 
 Micrograph.prototype.resourceAccepts = function(resource,obj) {
     if(resource['$type']){
@@ -359,7 +433,14 @@ Micrograph.prototype.resourceAccepts = function(resource,obj) {
     } else
 	return false;
 };
+*/
 
+/**
+ * Transforms a JSON representation of a node into a JSON object without any special property: $id, $type, $from, $state.
+ * Currently, no cyclic dependencies will be resolved.
+ *
+ * @param {Object} [obj] The object to be transformed
+ */
 Micrograph.prototype.toJSON = function(obj) {
     var json = JSON.parse(JSON.stringify(obj));
     var acum = [json];
@@ -467,6 +548,11 @@ Micrograph.prototype.sync = function(cb) {
 };
 */
 
+/**
+ * Check for all defined classes where this object is included, run the initialisers and append class functions
+ *
+ * @object {Object} [object] JSON encoded graph node.
+ */
 Micrograph.prototype.instantiate = function(object) {
     if(object['__micrograph__classes'] != null)
      	return this;
@@ -490,6 +576,11 @@ Micrograph.prototype.instantiate = function(object) {
 
 Micrograph.prototype.modificationName = null;
 
+/**
+ * Starts generating recording events for a group of graph operations. Events will be triggered once endGraphModification is invoked.
+ *
+ * @param {String} [name] Identifier for the batch of graph operations.
+ */
 Micrograph.prototype.startGraphModification = function(name) {
     if(name != null && this.modificationName!=null)
 	throw("Modification already being executed");
@@ -501,6 +592,11 @@ Micrograph.prototype.startGraphModification = function(name) {
     }
 };
 
+/**
+ * Finished a group of graph operations triggering the recorded events.
+ *
+ * @param {String} [name] Identifier of the batch of graph operations to trigger.
+ */
 Micrograph.prototype.endGraphModification = function(name) {
     if(name === this.modificationName || this.modificationName == null) {
 	this.modificationName = null;
@@ -508,6 +604,12 @@ Micrograph.prototype.endGraphModification = function(name) {
     }
 };
 
+/**
+ * Executes a query on the graph.
+ *
+ * @param {Object} [query] JSON encoded query pattern.
+ * @param {Function} [callback] Function that will be invoked with the results of the query.
+ */
 Micrograph.prototype.execute = function(query, callback) {
     this.startGraphModification();
     this.engine.execute(query,callback);
@@ -515,6 +617,11 @@ Micrograph.prototype.execute = function(query, callback) {
     return this;
 };
 
+/**
+ * Initiates a data selection based on the query pattern passed as a parameter.
+ *
+ * @param {Object} [query] JSON encoded query pattern
+ */
 Micrograph.prototype.where = function(query) {
     var queryObj =  new MicrographQuery(query);
     this.lastQuery = queryObj;
@@ -522,6 +629,11 @@ Micrograph.prototype.where = function(query) {
     return queryObj;
 };
 
+/**
+ * Inititates a data selection based on the path traversal passed as a parameter.
+ *
+ * @param {String} [path] a SPARQL path expression
+ */
 Micrograph.prototype.traverse = function(path) {
     
     var template = {'$id': this._('start')};
@@ -533,6 +645,11 @@ Micrograph.prototype.traverse = function(path) {
     return queryObj;
 };
 
+/**
+ * Triggers a data selection execution returning the results as instances
+ *
+ * @param {Function} [callback] Callback function receiving the resulting instances.
+ */
 Micrograph.prototype.instances = function(callback) {
     if(this.lastQuery.lastResult && this.lastQuery.lastResult.constructor === Array) {
 	for(var i=0; i<this.lastQuery.lastResult.length; i++)
@@ -549,10 +666,21 @@ Micrograph.prototype.instances = function(callback) {
 };
 
 
+/**
+ * Auxiliary function used to introduce variables in a tuple query
+ *
+ * @param {String} [varName] Name of the variable.
+ */
 Micrograph.prototype._ = function(varName) {
     return {'token': 'var', 'value':varName };
 };
 
+/**
+ * Transforms a JSON object with nested objects into an array of flatten JSON objects
+ *
+ * @param {Object} [data] The JSON object to be normalised.
+ * @param {bool} [oneLevel] If set to true, only objects at one level depth will be processed
+ */
 Micrograph.normalize = function(data, oneLevel) {
     oneLevel = oneLevel || false;
     var acum = [data];
@@ -597,6 +725,12 @@ Micrograph.normalize = function(data, oneLevel) {
     return toReturn;
 };
 
+/**
+ * Inserts the current data selection into the graph.
+ *
+ * @param {Object} [data] Data to be loaded. If no data is passed, the current selection is used.
+ * @param {Function} [callback] Mandatory callback function that will be invoked when the data has been loaded into the graph.
+ */
 Micrograph.prototype.load = function() {
     var mediaType;
     var data;
@@ -708,6 +842,12 @@ Micrograph.prototype.load = function() {
 
 };
 
+/**
+ * Saves a single JSON object into the data graph.
+ *
+ * @param {Object} [json] Data to be stored in the graph.
+ * @param {Function} [cb] Optional callback function that will be inovoked once the data is saved.
+ */
 Micrograph.prototype.save = function(json,cb) {
     this.transformFunction = null;
     this.load(json, function(objects){
@@ -717,6 +857,12 @@ Micrograph.prototype.save = function(json,cb) {
     return this;
 };
 
+/**
+ * Removes a single node from the data graph.
+ *
+ * @param {Object} [node] JSON encoded node graph with a valid $id property.
+ * @param {Function} [cb] Callback function that will be invoked after the node has been removed.
+ */
 Micrograph.prototype.removeNode = function(node, cb) {
     if(typeof(node) === 'string') 
 	node = {'$id': node};
@@ -730,6 +876,13 @@ Micrograph.prototype.removeNode = function(node, cb) {
     return this;
 };
 
+/**
+ * Updates a single graph node.
+ *
+ * @param {Object} [json] JSON encoded node graph with a valid $id property.
+ * @param {bool} [processInverse] If set to true, inverse links will also be udpated. Optional.
+ * @param {Function} [callback] Function that will be invoked once the graph node has been updated.
+ */
 Micrograph.prototype.updateNode = function() {
     var json, processInverse, cb;
     if(arguments.length === 1) {
@@ -812,6 +965,12 @@ Micrograph.prototype.updateNode = function() {
     }
 };
 
+/**
+ * Updates the state of a node in the graph without modifying any other piece of state.
+ *
+ * @param {Object}  [nodeOrID] JSON encoded node or string with the $id of the node whose state must be updated.
+ * @param {String} [state] The new state for the node.
+ */
 Micrograph.prototype.setState = function(nodeOrID, state) {
     var id = nodeOrID
     if(typeof(nodeOrID)==='object') {
@@ -847,6 +1006,12 @@ Micrograph.prototype.setState = function(nodeOrID, state) {
     }
 };
 
+/**
+ * Sets the $id value for an already existing graph node.
+ *
+ * @param {Object}  [nodeOrID] JSON encoded node or string with the $id of the node whose state must be updated.
+ * @param {String} [state] The new $id value for the node.
+ */
 Micrograph.prototype.setId = function(nodeOrID, newID) {
     var id = nodeOrID
     if(typeof(nodeOrID)==='object') {
@@ -903,7 +1068,14 @@ Micrograph.prototype.setId = function(nodeOrID, newID) {
     }
 };
 
-Micrograph.prototype.bind = function(query,mg_query, callback) {
+/**
+ * Registers a query that will be re-evaluated according to changes in the graph data.
+ *
+ * @param {Object} [query] JSON encoded query pattern.
+ * @param {MicrographQuery} [mg_query]  MicrographQuery object with the context of the query to be bound.
+ * @param {Function} [callback] Callback function that will be bound 
+ */
+Micrograph.prototype.bind = function(query, mg_query, callback) {
     // execution
     var queryIdentifier = 'cb'+this.callbackCounter;
     this.callbackCounter++;
@@ -945,6 +1117,11 @@ Micrograph.prototype.bind = function(query,mg_query, callback) {
     return this;
 };
 
+/**
+ * Unregisters a callback function.
+ *
+ * @param {Object} [queryIdentifier] String query ID passed to the callback function in function invocations or the callback function object.
+ */
 Micrograph.prototype.unbind = function(queryIdentifier) {
     if(typeof(queryIdentifier) === 'function')
 	queryIdentifier = this.callbackToInner[queryIdentifier];
@@ -955,6 +1132,22 @@ Micrograph.prototype.unbind = function(queryIdentifier) {
     return this;
 };
 
+/**
+ * Creates a data selection from a remote data source using an AJAX+CORS or JSONP request.
+ *
+ * @param {String} [uri] URI where the data will be retrieved.
+ * @param {Object} [options] Hash of options for the remote request.
+ * <ul>
+ *  <li> media: Media type to request and process. Possible values are: microdata and n3. If none is specifed JSON will be requested.</li>
+ *  <li> jsonp: If a JSONP request must be used, name of the callback or true for a name to be randomly generaed </li>
+ *  <li> crossDomain: will force the use of XDomainRequest object in IE browsers not supporting CORS</li>
+ *  <li> callback: Name of the callback parameter for the JSONP request.</li>
+ *  <li> timeout: Max. number of milliseconds before the JSONP request times out.</li>
+ *  <li> maxRetries: Max. number of times the JSONP request will be retrievd before giving up.</li>
+ *  <li> result: Optional name of property in a JSONP response where the actual answer data is stored.</li>
+ * </ul>
+ * @param {Function} [callback] Function that will be invoked when the data have been retrieved.
+ */
 Micrograph.prototype.from = function(uri, options, callback) {
     this.transformFunction = null;
     if(!options) {
@@ -1068,13 +1261,29 @@ Micrograph._parseTransformFunction = function(spec) {
     };
 };
 
-Micrograph.prototype.transform = function(f) {
-    if(typeof(f) === 'object') 
-	f = Micrograph._parseTransformFunction(f);
-    this.transformFunction = f;
+/**
+ * Function that will be applied to the data retrieved from a remote selection.
+ *
+ * @param {Function} [cb] Transformation function that will be applied.
+ */
+Micrograph.prototype.transform = function(cb) {
+    if(typeof(cb) === 'object') 
+	cb = Micrograph._parseTransformFunction(cb);
+    this.transformFunction = cb;
     return this;
 };
 
+/**
+ * Makes an AJAX+CORS request to retrieve remote data. In IE browser version<10, a XDomainRequest
+ * will be tried instead.
+ *
+ * @param {String} [method] Method for the request.
+ * @param {String} [url] Remote URI.
+ * @param {Object} [options] Hash of options, see from documentation for the list of available options.
+ * @param {Object} [data] JSON object of data that will be send in POST requests.
+ * @param {Function} [callback] Callback function that will be invoked on successful completion of the request.
+ * @param {Function} [errorCallback] Optional callback function that will be invoked if the request fails.
+ */
 Micrograph.ajax = function(method, url, options, data, callback, errorCallback) {
     var dataFormat = options['media'];
     if(dataFormat == null || dataFormat === "json")
@@ -1102,7 +1311,7 @@ Micrograph.ajax = function(method, url, options, data, callback, errorCallback) 
 
     var xhr = new XMLHttpRequest();
 
-    if (typeof XDomainRequest != "undefined" && !xhr["withCredentials"]) {
+    if (typeof XDomainRequest != "undefined" && !xhr["withCredentials"] && options["crossDomain"]) {
 	// XDomainRequest for IE.
 
 	xhr = new XDomainRequest();
@@ -1145,6 +1354,14 @@ Micrograph.jsonpCallbackCounter = 0;
 Micrograph.jsonpRequestsConfirmations = {};
 Micrograph.jsonpRetries = {};
 
+/**
+ * Parses Microdata information in some text string.
+ *
+ * @param {String} [from] Base URI where the HTML+Microdata text was retrieved.
+ * @param {String} [data] String containing the Microdata markdown to be parsed.
+ * @param {Object} [options] Option hash of options for the parser.
+ * @param {Function} [cb] Callback function that will be invoked with the results.
+ */
 Micrograph.prototype.microdata = function(from, data, options, cb) {
     var tempDiv = document.createElement('div');
     if(typeof(options) === "function")
@@ -1159,6 +1376,15 @@ Micrograph.prototype.microdata = function(from, data, options, cb) {
     return this;
 };
 
+
+/**
+ * Parses N3 information in some text string. This is just a wrapper method for the actual parser in the n3 module.
+ *
+ * @param {String} [from] Base URI where the N3 text was retrieved.
+ * @param {String} [data] String containing the N3 markdown to be parsed.
+ * @param {Object} [options] Option hash of options for the parser.
+ * @param {Function} [cb] Callback function that will be invoked with the results.
+ */
 Micrograph.prototype.n3 = function(from, data, options, cb) {
     if(Micrograph.n3)
 	this.load(Micrograph.n3(from, data, options), cb);
@@ -1167,6 +1393,16 @@ Micrograph.prototype.n3 = function(from, data, options, cb) {
     return this;
 };
 
+/**
+ * Makes an JSONP request to retrieve remote data. In IE browser version<10, a XDomainRequest
+ * will be tried instead.
+ *
+ * @param {String} [fragment] Remote URI it may include the callback parameter.
+ * @param {Function} [callback] Callback function that will be invoked on successful completion of the request.
+ * @param {Function} [errorCallback] Optional callback function that will be invoked if the request fails.
+ * @param {String} [callbackParameter] Optional name for the callback parameter, otherwise it will be looked fo in the fragment or finally 'callback' will be used by default.
+ * @param {Object} [options] Hash of options, see from documentation for the list of available options.
+ */
 Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, options, ignore) {
     ignore = ignore || false;
     options = options || {};

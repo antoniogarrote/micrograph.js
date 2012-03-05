@@ -1,6 +1,6 @@
 #micrograph.js
 
-Graph data layer for client JS applications.
+Graph data layer for client JS applications using JSON, Microdata or RDF.
 
     var mg = require('micrograph');
 
@@ -29,3 +29,14 @@ Graph data layer for client JS applications.
      		    assert(authored[0].author$in.surname === "Popper");		
      	    });
         });
+
+## Building
+
+Use the included ruby script:
+
+    $./make.rb
+
+## Documentation
+
+A detailed description of the library with some examples can be found <a href="http://antoniogarrote.github.com/micrograph.js/index.html">here</a>.
+JSDoc files for the project are available <a href="http://antoniogarrote.github.com/micrograph.js/doc/index.html">here</a>.
