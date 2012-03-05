@@ -40,3 +40,7 @@ Use the included ruby script:
 
 A detailed description of the library with some examples can be found <a href="http://antoniogarrote.github.com/micrograph.js/index.html">here</a>.
 JSDoc files for the project are available <a href="http://antoniogarrote.github.com/micrograph.js/doc/index.html">here</a>.
+
+## License
+
+Lincesed under the <a rel="license" href="http://www.gnu.org/licenses/lgpl.html">LGPL license V3</a>
