@@ -45,6 +45,7 @@
     <script type="text/javascript" src="js/jsonStringify.js"></script>
     <script type="text/javascript">
       jQuery(document).ready(function() {
+
           var exampleIDs = ["ex1", "ex2", "ex3", "ex4", "ex5", "ex6", "ex7", "ex8", "ex9",
                             "ex10", "ex11", "ex12", "ex13", "ex14", "ex15", "ex16", "ex17",
 			    "ex18", "ex19", "ex16b", "ex20", "ex21", "ex22", "ex23", "ex24",
@@ -339,7 +340,9 @@
 		</div>
 	      </div>
 
-	      The library supports the creation of persistent graphs using W3C's <a href="http://www.w3.org/TR/webstorage/">Web Storage</a> recommendation. In order to create a persistent graph or open an already persisted graph, the function <code>open</code> must be used instead of <code>create</code>. This function accepts a name for the graph, a flag indicating if the data in the graph must be overwritten, an optional hash of parameters and the completion callback:
+	      The library supports the creation of persistent graphs using W3C's <a href="http://www.w3.org/TR/webstorage/">Web Storage</a> recommendation. 
+	      The functionality is available in the <code>local_storage</code> module distributed with the library.
+              In order to create a persistent graph or open an already persisted graph, the function <code>open</code> must be used instead of <code>create</code>. This function accepts a name for the graph, a flag indicating if the data in the graph must be overwritten, an optional hash of parameters and the completion callback:
 
 	      <div class="example row" id="ex4">
 		<div class="tabs-options span11">
@@ -378,7 +381,7 @@
 	      
 	      The library supports loading data from remote resources through AJAX, AJAX + <a href="http://www.w3.org/TR/cors/">CORS</a> or JSONP requests. The location where data will be retrieved from must be set using the <code>from</code> function before invoking the <code>load</code> function that performs the actual retrieval. <code>from</code> accepts two parameters: the remote URL string and an optional hash of parameters. If the URL string includes a 'callback' HTTP request parameter name, a JSONP callback will be triggered automatically. Otherwise an AJAX request will be performed. If the JSONP request must use a different callback name, it can be passed in the options hash.
 	      <br/>
-              The following example retrieves some data from Github's API and stores it in the graph. After loading the objects the <code>$from</code> property in the newly created nodes will point to the original URI where objects were retrieved from. All objects will also be assigned an unique <code>$id</code> property and the <code>$state</code> property for the objects will be set to the value <clode>loaded</code>.
+              The following example retrieves some data from Github's API and stores it in the graph. After loading the objects the <code>$from</code> property in the newly created nodes will point to the original URI where objects were retrieved from. All objects will also be assigned an unique <code>$id</code> property and the <code>$state</code> property for the objects will be set to the value <code>loaded</code>.
 
 	      <div class="example row" id="ex6">
 		<div class="tabs-options span11">
