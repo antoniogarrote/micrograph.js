@@ -144,7 +144,7 @@ window['examples'] = {
 
     ex7: {
 	source:
-'g.from("https://api.github.com/repos/mbostock/d3/collaborators",\n\
+'g.from("https://api.github.com/repos/rails/rails/collaborators",\n\
        {jsonp: "callback"})\n\
  .transform(function(prop,obj) {\n\
      if(prop == null) {\n\
@@ -166,7 +166,7 @@ window['examples'] = {
 
     ex8: {
 	source:
-'g.from("https://api.github.com/repos/mbostock/d3/collaborators?callback=collabs")\n\
+'g.from("https://api.github.com/repos/mbostock/rails/rails?callback=collabs")\n\
  .transform({\n\
      "null": {"@delete":"meta"},\n\
      "data": {"@id": "url",\n\
