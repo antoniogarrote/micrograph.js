@@ -2,10 +2,8 @@
 var QueryEngine = require("./../../js-query-engine/src/query_engine").QueryEngine;
 var QuadBackend = require("./../../js-rdf-persistence/src/quad_backend").QuadBackend;
 var Lexicon = require("./../../js-rdf-persistence/src/lexicon").Lexicon;
-var WebLocalStorageLexicon = require("./../../js-rdf-persistence/src/web_local_storage_lexicon").WebLocalStorageLexicon;
 var Utils = require("./../../js-trees/src/utils").Utils;
 var InMemoryBTree = require("./../../js-trees/src/in_memory_b_tree").InMemoryBTree;
-var WebLocalStorageBTree = require("./../../js-trees/src/web_local_storage_b_tree").WebLocalStorageBTree;
 
 var MicrographQuery = require('./micrograph_query').MicrographQuery;
 var MicrographQL = require('./micrograph_ql').MicrographQL;
@@ -259,7 +257,7 @@ var Micrograph = function(options, callback) {
     var isPersistent = options['persistent'];
     var LexiconModule = Lexicon;
     if(isPersistent) 
-	LexiconModule = WebLocalStorageLexicon;
+	LexiconModule = Micrograph.WebLocalStorageLexicon;
 
     new LexiconModule.Lexicon(function(lexicon){
         if(options['overwrite'] === true) {
@@ -269,7 +267,7 @@ var Micrograph = function(options, callback) {
 
 	var baseTree = InMemoryBTree;
 	if(isPersistent)
-	    baseTree = WebLocalStorageBTree;
+	    baseTree = Micrograph.WebLocalStorageBTree;
 	    
         new QuadBackend.QuadBackend(options, baseTree, function(backend){
             if(options['overwrite'] === true) {
@@ -305,6 +303,16 @@ var Micrograph = function(options, callback) {
     },options['name']);
 };
 exports.Micrograph = Micrograph;
+
+/**
+ * Placeholder for the persistent lexicon implementation
+ */
+Micrograph.WebLocalStorageLexicon;
+
+/**
+ * Placeholder for the persistent BTree implementation
+ */
+Micrograph.WebLocalStorageBTree;
 
 /**
  * Version of the library.
@@ -369,30 +377,6 @@ Micrograph.create = function() {
 };
 
 /**
- * Creates a new persistent Micrograph instance.
- *
- * @param {String} [name] a name identifying the persistent graph.
- * @param {bool} [overwrite] flag indicating if the data in the graph must be overwritten.
- * @param {Object} [options] a hash of options for the graph constructor. See Micrograph function.
- * @param {Function} [callback] optional callback function that will be invoked with the new graph instance.
- */
-Micrograph.open = function(name,overwrite,options,callback) {
-    if(!callback) {
-	if(typeof(options) === 'function') {
-	    callback = options;
-	    options = {};
-	}  else {
-	    throw "Persistent storage requires a callback functon";
-	}
-    }
-    options['persistent'] = true;
-    options['name'] = name;
-    options['overwrite'] = overwrite;
-    
-    new Micrograph(options, callback);
-};
-
-/**
  * Defines a new class for the for the expression and prototype object passes as parameters.
  *
  * @param {String} [classExpression] a expression consisting of a $type name a property name using the syntax prop(), and the connectives: and, or, not.
@@ -442,7 +426,7 @@ Micrograph.prototype.resourceAccepts = function(resource,obj) {
  * @param {Object} [obj] The object to be transformed
  */
 Micrograph.prototype.toJSON = function(obj) {
-    var json = JSON.parse(JSON.stringify(obj));
+    var json = Micrograph.clone(obj);
     var acum = [json];
     var current;
     while(acum.length > 0) {
@@ -1177,12 +1161,12 @@ Micrograph.prototype.from = function(uri, options, callback) {
 	this.defaultFrom = baseUri;
 	this.defaultState = 'loaded';	
 
-	if(!callback) {
+	if(callback != null) {
 	    var that = this;
 	    var data = [];
 	    Utils.repeatAsync(0,acum.length, function(k,env) {
 		var floop = arguments.callee;
-		that.from(that.acum[env._i]['uri'], acum[env._i], function(result) {
+		that.from(acum[env._i]['uri'], acum[env._i], function(result) {
 		    data.push(result);
 		    k(floop,env);
 		});
@@ -1525,4 +1509,70 @@ Micrograph._insertDataQuery = function(quads) {
 	    }
 	]
     };
+};
+
+Micrograph._cloneDeep = function() {
+    var options, name, src, copy, copyIsArray, clone,
+    target = arguments[0] || {},
+    length = arguments.length,
+    deep = true;
+    var i = 1;
+
+    // Handle case when target is a string or something (possible in deep copy)
+    if ( typeof target !== "object" && typeof(target) !== "function" ) {
+	target = {};
+    }
+
+    for ( ; i < length; i++ ) {
+	// Only deal with non-null/undefined values
+	if ( (options = arguments[ i ]) != null ) {
+	    // Extend the base object
+	    for ( name in options ) {
+		src = target[ name ];
+		copy = options[ name ];
+
+		// Prevent never-ending loop
+		if ( target === copy ) {
+		    continue;
+		}
+
+		// Recurse if we're merging plain objects or arrays
+		if ( deep && copy && ( typeof(copy) == "object" || (copyIsArray = (copy.constructor === Array)) ) ) {
+		    if ( copyIsArray ) {
+			copyIsArray = false;
+			clone = src && typeof(src) === Array ? src : [];
+
+		    } else {
+			clone = src && typeof(src) === "object" && src.constructor === Array ? src : {};
+		    }
+
+		    // Never move original objects, clone them
+		    console.log("DEEP COPYING");
+		    console.log(name);
+		    console.log(clone);
+		    target[ name ] = Micrograph._cloneDeep( {}, clone );
+
+		    // Don't bring in undefined values
+		} else if ( copy !== undefined ) {
+		    target[ name ] = copy;
+		}
+	    }
+	}
+    }
+
+    // Return the modified object
+    return target;
+};
+
+/**
+ * Clones an object either using ES5 Object.clone or deep clone from jQuery.
+ *
+ * @param {Object} [obj] The object that will be cloned
+ */
+Micrograph.clone = function(obj) {
+    if(Object.clone) {
+	return Object.clone(obj);
+    } else {
+	return Micrograph._cloneDeep({},obj);
+    }
 };

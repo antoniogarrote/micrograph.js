@@ -55,12 +55,12 @@ def minimize_output_browser_persistent
   puts "*** minimizing output"
   `cp ./closure-compiler.jar ./dist/browser_persistent/`
 #  `cd ./dist/browser && java -jar closure-compiler.jar --compilation_level=ADVANCED_OPTIMIZATIONS --js=micrograph.js > micrograph_min.js`
-  `cd ./dist/browser_persistent && java -jar closure-compiler.jar --compilation_level=SIMPLE_OPTIMIZATIONS --js=micrograph.js > micrograph_min.js`
-  `cp ./dist/browser_persistent/micrograph_min.js ./dist/browser_persistent/micrograph_min.js.bak`
-  `cd ./dist/browser_persistent && gzip -9 micrograph_min.js`
-  `mv ./dist/browser_persistent/micrograph_min.js.bak ./dist/browser_persistent/micrograph_min.js`
+  `cd ./dist/browser_persistent && java -jar closure-compiler.jar --compilation_level=SIMPLE_OPTIMIZATIONS --js=local_storage.js > local_storage_min.js`
+  `cp ./dist/browser_persistent/local_storage_min.js ./dist/browser_persistent/local_storage_min.js.bak`
+  `cd ./dist/browser_persistent && gzip -9 local_storage_min.js`
+  `mv ./dist/browser_persistent/local_storage_min.js.bak ./dist/browser_persistent/local_storage_min.js`
   `rm ./dist/browser_persistent/closure-compiler.jar`
-  `cp ./dist/browser_persistent/micrograph*.js ./browsertests/persistent/`
+  `cp ./dist/browser_persistent/local_storage*.js ./browsertests/non_persistent/`
 end
 
 
@@ -200,19 +200,8 @@ def process_files_for_browser
 end
 
 def process_files_for_browser_persistent
-  File.open("./dist/browser_persistent/micrograph.js", "w") do |of|
-
-    if BUILD_CONFIGURATION[:browser_persistent][:load_jquery]
-      File.open("./src/js-communication/src/jquery_ajax.js", "r") do |f|
-        f.each_line do |line|
-          of << line
-        end
-      end
-    end
-
-    
-    write_browser_preamble(of)
-    
+  File.open("./dist/browser_persistent/local_storage.js", "w") do |of|
+    of << "(function(){\n"
     BUILD_CONFIGURATION[:browser_persistent][:modules].each do |module_file|
       puts "*** processing #{module_file}"
       File.open(module_file, "r") do |f|
@@ -220,8 +209,7 @@ def process_files_for_browser_persistent
         of << "\r\n// end of #{module_file} \r\n"
       end
     end
-
-    write_browser_coda(of)
+    of << "})();"
   end
 end
 
@@ -232,6 +220,7 @@ def make_browser
   process_files_for_browser
   minimize_output_browser
   minimize_output_n3
+  make_browser_persistent
 end
 
 def make_browser_persistent
@@ -240,11 +229,10 @@ def make_browser_persistent
   build_distribution_directory 'browser_persistent'
   process_files_for_browser_persistent
   minimize_output_browser_persistent
-  puts "\r\n*** FINISHED"
 end
 
 
 # build!
 make_browser
-`tar -cvf mg.tar.gz ./dist/browser/micrograph.js ./dist/browser/micrograph_min.js ./dist/browser/n3.js ./dist/browser/n3_min.js`
+`tar -cvf mg.tar.gz ./dist/browser/micrograph.js ./dist/browser/micrograph_min.js ./dist/browser/n3.js ./dist/browser/n3_min.js ./dist/browser_persistent/local_storage.js ./dist/browser_persistent/local_storage.js`
 puts "\r\n*** FINISHED"

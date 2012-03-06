@@ -26,7 +26,7 @@ exports.MicrographQuery = function(template) {
     this.startNodePath = null;
     this.endNodePath = null;
 };
-
+var MicrographQuery = exports.MicrographQuery;
 
 /**
  * Sets the kind of query. Possible values are 'all', 'first', 'allTuples', etc.

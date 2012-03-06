@@ -103,6 +103,7 @@ this.micrograph_suite.testJSONP2 = function(test) {
 		"https://api.github.com/repos/clojure/clojure"],
 	       {jsonp:'callback'}).
 	    onError(function(e){
+		console.log(e);
 		test.ok(false);
 		test.done();
 	    }).
@@ -931,7 +932,7 @@ this.micrograph_suite.update1 = function(test) {
 	    where({name: 'Bertrand'}).
 	    first(function(russell) {
 		russell.profession = 'logician';
-		g.update(russell, function(res) {
+		g.updateNode(russell, function(res) {
 		    test.ok(res);
 		});
 	    }).

@@ -1,6 +1,6 @@
 this.persistence_suite = {};
 
-/*
+
 this.persistence_suite.creation_overwrite = function(test) {
     var data = [{data:1},
 		{data:2},
@@ -28,7 +28,7 @@ this.persistence_suite.creation_overwrite = function(test) {
 	});
     });
 };
-*/
+
 
 
 this.persistence_suite.creation_overwrite = function(test) {
@@ -574,7 +574,7 @@ this.persistence_suite.update1 = function(test) {
 	    where({name: 'Bertrand'}).
 	    first(function(russell) {
 		russell.profession = 'logician';
-		g.update(russell, function(res) {
+		g.updateNode(russell, function(res) {
 		    test.ok(res);
 		});
 	    }).
@@ -674,7 +674,7 @@ this.persistence_suite.bind2b = function(test) {
 	    g.where({name: 'Niels'}).
 		first(function(nb){
 		    nb['profession'] = 'phisicist';
-		    g.update(nb);
+		    g.updateNode(nb);
 		}).
 		save({name: 'Wolfgang',
 		      surname: 'Pauli',
