@@ -166,7 +166,7 @@ window['examples'] = {
 
     ex8: {
 	source:
-'g.from("https://api.github.com/repos/rails/rails?callback=collabs")\n\
+'g.from("https://api.github.com/repos/rails/rails/collaborators?callback=collabs")\n\
  .transform({\n\
      "null": {"@delete":"meta"},\n\
      "data": {"@id": "url",\n\
