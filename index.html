@@ -124,7 +124,6 @@
 			  var query = window[root.replace("#","source")].getValue();
 			  eval(query);
 		      } catch(e) {
-		          debugger;
 			  output("EXCEPTION: "+e);
 		      }
 		  });
@@ -150,7 +149,6 @@
 			  var query = window[root.replace("#","source")].getValue();
 			  eval(query);
 		      } catch(e) {
-			  debugger;
 			  output("EXCEPTION: "+e);
 		      }
 		  })
@@ -275,7 +273,7 @@
 	  <div class="row">
 	    <div class="span10">
 	      <h2 id="introduction">Introduction</h2>
-	      Micrograph.js is a JavaScript library providing a data graph layer for JSON objects, Microdata and RDF data. It implements functions for data retrieval, querying, traversal and transformation of data. Information from different resources or even different APIs can be linked in the graph using property values or transformations of these properties. The library also implements an event system allowing to register observer functions that will be notified after certain modifications of the data graph. Finally, a system of classes makes possible to associate behaviour to the graph data.
+	      Micrograph.js is a JavaScript library providing a data graph layer for <a href="http://www.json.org/">JSON</a> objects, <a href="http://dev.w3.org/html5/md/Overview.html">Microdata</a> and <a href="http://www.w3.org/RDF/">RDF</a> data. It implements functions for data retrieval, querying, traversal and transformation of data. Information from different resources or even different APIs can be linked in the graph using property values or transformations of these properties. The library also implements an event system allowing to register observer functions that will be notified after certain modifications of the data graph. Finally, a system of classes makes possible to associate behaviour to the graph data.
 
 	      <h3>JSON objects, identity and  special properties</h3>
 	      The library is designed to work with plain JSON objects without any additional or special purpose notation. These JSON objects are inserted as nodes into the graph of data. One of the main drawbacks of the use of JSON as an exchange format is the absence of an explicit identifier for JSON objects. This is a problem in many situations, for example, when trying to establish a relationship between objects. In those cases, most APIs use a property in the objects as an ad-hoc identifier. Micrograph.js uses a special property <code>$id</code> to associate an identity to every object loaded in the graph. If the object being loaded does not include a value for this property, a new identifier will be generated and associated to the object when it is loaded into the graph. 
@@ -290,9 +288,9 @@
 	      <h3>Queries</h3>
 	      Micrograph.js supports two different kind of queries: node queries and tuple queries.
 	      <br/>	      
-	      When objects are loaded into the graph, they are decomposed into a set of simple logical assertions about those objects. Node queries can be thought of as templates, encoded as JSON objects, for the nodes that must be retrieved.Patterns will be filled with a consistent collection of the assertions stored in the graph. The final output of the query is a collection of JSON objects collecting the assertions for the nodes matched by the query template.
+	      When objects are loaded into the graph, they are decomposed into a set of simple logical assertions about those objects. Node queries can be thought of as JSON templates for the nodes that must be retrieved. Patterns will be filled with a consistent collection of the assertions stored in the graph.
 	      <br/>	      
-	      The following query is an example of a query that retrieves all the books in the graph:
+	      The following query is an example that retrieves all books in the graph:
 
 	      <div class="example row" id="ex1">
 		<div class="tabs-options span11">
@@ -309,7 +307,7 @@
 		</div>
 	      </div>
 
-	    Tuple queries on the other hand receive a query pattern including some variables and return all tuples with bindings for those variables in the graph. The following example uses a tuple query to look for relationships between authors and books:
+	    Tuple queries on the other hand receive a query pattern, including some variables and return all tuples with bindings for those variables in the graph. The following example uses a tuple query to look for relationships between authors and books:
 
 	      <div class="example row" id="ex2">
 		<div class="tabs-options span11">
@@ -381,7 +379,7 @@
 	      
 	      The library supports loading data from remote resources through AJAX, AJAX + <a href="http://www.w3.org/TR/cors/">CORS</a> or JSONP requests. The location where data will be retrieved from must be set using the <code>from</code> function before invoking the <code>load</code> function that performs the actual retrieval. <code>from</code> accepts two parameters: the remote URL string and an optional hash of parameters. If the URL string includes a 'callback' HTTP request parameter name, a JSONP callback will be triggered automatically. Otherwise an AJAX request will be performed. If the JSONP request must use a different callback name, it can be passed in the options hash.
 	      <br/>
-              The following example retrieves some data from Github's API and stores it in the graph. After loading the objects the <code>$from</code> property in the newly created nodes will point to the original URI where objects were retrieved from. All objects will also be assigned an unique <code>$id</code> property and the <code>$state</code> property for the objects will be set to the value <code>loaded</code>.
+              The following example retrieves some data from Github's API and stores it in the graph. After loading the objects the <code>$from</code> property in the newly created nodes will point to the original URI where objects were retrieved from. All objects will also be assigned an unique <code>$id</code> property and the <code>$state</code> property for the objects will be set to the <code>loaded</code> value.
 
 	      <div class="example row" id="ex6">
 		<div class="tabs-options span11">
@@ -400,7 +398,7 @@
 
 	      <h3>Transforming Retrieved Data</h3>
 
-	      Iit is often desirable to perform some kind of transformation on the data retrieved from a remote resource before inserting that data in the graph. For example, most APIs include properties in the objects semantically equivalent to the <code>$type</code> and <code>$id</code> properties supported by micrograph.js. These properties can be mapped to the special properties before loading the objects, specially if we try to link objects from different APIs. The most direct way to apply a  transformation to the fetched data using the library is to pass a callback to the <code>from</code> function. This function will receive the retrieved objects before they are inserted in the graph. 
+	      Iit is often desirable to perform some kind of transformation on the data retrieved from a remote resource before inserting the data in the graph. For example, most APIs include properties in the objects semantically equivalent to the <code>$type</code> and <code>$id</code> properties supported by micrograph.js. These properties can be mapped to the special properties before loading the objects, specially if we try to link objects from different APIs. The most direct way to apply a  transformation to the fetched data using the library is to pass a callback to the <code>from</code> function. This function will receive the retrieved objects before they are inserted in the graph. 
 <br/>
 Additionally, the library provides the <code>transform</code> function, that will iterate through the properties of the loaded objects giving the user the chance to transform the objects linked to those properties. 
 	      <br/>
@@ -419,7 +417,7 @@ Additionally, the library provides the <code>transform</code> function, that wil
 		</div>
 	      </div>
 
-	      Another possibility supported by the library is to pass a declarative transformation instead of a function to the <code>transform</code> function. A declarative transformation is just a JSON object where certain actions are declared to be executed for the properties of the loaded objects. Available transformations include:
+	      Another option is to pass a declarative transformation for the data instead of a function to the <code>transform</code> function. A declarative transformation is just a JSON object where certain actions are declared for the properties of the loaded objects. These actions will be triggered when the data is loaded and the resulting object inserted into the graph. Available transformations include:
 	      <ul>
 		<li><code>@id</code>: associates the value of the this property as the <code>$id</code> property of the object</li>
 		<li><code>@type</code>: associates the value of the this property as the <code>$type</code> property of the object</li>
@@ -427,7 +425,7 @@ Additionally, the library provides the <code>transform</code> function, that wil
 		<li><code>propertyName</code>: an action associated to the provided property</li>
 	      </ul>
 
-	      Actions associated to these keys can be strings with the name of a property in the object or a function. If a string is passed the value for that property in the object will be used in the action. If a function is associated, it will be evaluated, passing the object as an argument, and the result used in the action.
+	      Actions associated to these properties can be functions or just strings with the name of a property in the object. If a string is passed the value for that property in the object will be used in the action. If a function is associated, it will be evaluated, receiving the object as an argument, and the result used in the action.
 	      <br/>
 	      The following example shows an equivalent transformation of the Github's repository API but using a declarative transformation instead of a function to transform the incoming data:
 
@@ -470,7 +468,7 @@ Additionally, the library provides the <code>transform</code> function, that wil
 
 	      Queries over the data graph are initiated using the <code>where</code> function accepting a query pattern as an argument. The <code>where</code> function can be used to describe patterns for the two kind of queries supported by the store: node queries and tuple queries.
 	      <br/>
-	      After defining a node query, results can be retrieved, iterated and filtered using a collection of functions like <code>all</code>, <code>each</code>, <code>first</code>, <code>select</code>, <code>map</code> and <code>reduce</code>. In the case of tuples queries, results can be retrieved using the <code>tuples</code> function.
+	      After defining a node query, results can be retrieved, iterated and filtered using a collection of functions like <code>all</code>, and <code>first</code>. In the case of tuple queries, results can be retrieved using the <code>tuples</code> function.
 
 
 	    <h3>Node Queries</h3>
@@ -493,7 +491,7 @@ Additionally, the library provides the <code>transform</code> function, that wil
 	      </div>
 
 
-	      More complex queries are built adding restrictions to the node patterns. The most basic restriction consists of binding a property to a fixed value. Only the nodes matching that value on some data node will be returned.
+	      More complex queries are built adding restrictions to node patterns. The most basic restriction consists of binding a property to a fixed value. Only the nodes matching that value on some data node will be returned.
 	      In the following example only people stored in the graph will be returned after adding that restriction on the <code>$type</code> property:
 
 	      <div class="example row" id="ex11">
@@ -967,14 +965,14 @@ Additionally, the library provides the <code>transform</code> function, that wil
  In order to add RDF data to the graph, some changes in RDF data model were required:
 	      <ul>
 		<li>Blank nodes are assigned unique IDs</li>
-		<li>Object values with a JavaScript compatible data type, like <code>xsd:float</code> is transformed into a native JavaScript object</li>
+		<li>Object values with a JavaScript compatible data type, like <code>xsd:float</code> are transformed into native JavaScript objects.</li>
 		<li>Object values with an unsupported data type are transformed into full nodes with <code>$id</code>, <code>value</code> and  <code>datatype</code> properties.</li>
-		<li>Literals with language tags are ignored unless the user selects the language as an option using the <code>lang</code> <code>from</code> option.</li>
+		<li>Literals with language tags are ignored unless the user sets the <code>lang</code> option in the <code>from</code> function call.</li>
 	      </ul>
 
-	      RDF uses URIs to identify objects in the RDF graph but also to identify properties linking nodes to values or other nodes. When dealing with RDF nodes, using whole URIs as property names can be cumbersome. The library offers two solutions for this problem. A <code>ns</code> property with a hash of URI prefixes and namespace identifiers can be passed to the <code>from</code> function. In this case, URIs will be tranformed into <a href="http://www.w3.org/TR/curie/">CURIEs</a> of the form : <code>ns:value</code>. The library already defines some prefixes for some common RDF vocabularies like FOAF or Dublin Core.
+	      RDF uses URIs to identify objects in the RDF graph but also to identify properties. When dealing with RDF nodes, using whole URIs as property names can be cumbersome. The library offers two solutions for this problem. A <code>ns</code> property with a hash of URI prefixes and namespace identifiers can be passed to the <code>from</code> function. In this case, URIs will be tranformed into <a href="http://www.w3.org/TR/curie/">CURIEs</a> of the form : <code>ns:value</code>. The library already defines some prefixes for some common RDF vocabularies like <a href="http://www.foaf-project.org/">FOAF</a> or <a href="http://dublincore.org/">Dublin Core</a>.
 	      <br/>
-	      Additionally, the <code>compactProperties</code> option can be set to true in the <code>from</code> function. In this case, all property URIs will be trimmed to their last fragment. Use of this option may cause that different properties sharing the same suffix become the same property.
+	      Additionally, the <code>compactProperties</code> option can be set to true in the <code>from</code> function. In this case, all property URIs will be reduced to their last fragment. Using of this option may cause that different properties sharing the same suffix become the same property.
 	      <br/>
 	      The following example shows how to use the N3 parser and a CORS request to retrieve information about the city of <a href="http://dbpedia.org/page/Barcelona">Barcelona from DBPedia</a>. It also shows how to use the <code>ns</code> option to produce simpler property names.
 	      
@@ -1016,11 +1014,5 @@ Additionally, the library provides the <code>transform</code> function, that wil
 
 
     </div> <!-- /container -->
-      <script>
-	//var _gaq=[['_setAccount','UA-XXXXX-X'],['_trackPageview']];
-	//(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
-	//g.src=('https:'==location.protocol?'//ssl':'//www')+'.google-analytics.com/ga.js';
-	//s.parentNode.insertBefore(g,s)}(document,'script'));
-      </script>
   </body>
 </html>
