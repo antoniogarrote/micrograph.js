@@ -16,28 +16,40 @@
     <meta name="author" content="Antonio Garrote">
 
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
-    <script type="text/javascript" src="./js/d3.js"></script>
     <script type="text/javascript" src="./js/ko.js"></script>
     <script type="text/javascript" src="./js/micrograph.js"></script>
 
     <script type="text/javascript">
+       mg.create(function(g) {
+           window['g'] = g;
+           g.from("https://www.googleapis.com/freebase/v1/search?query=ipad&callback=matches")
+            .load(function() {
+        
+        	 g.where({name: {$like: "^iPad( [23])?$"}})
+                 .map(function(match) {
+                     return match.mid;
+                 })
+                 .each_cc(function(mid, k) {
+                     g.from("https://www.googleapis.com/freebase/v1/mqlread?query={\"mid\":\""+mid+"\",\"type\":\"/base/gadgets/gadget\",\"*\":null}&callback=laodgadget").load(k);
+        	  })
+        	  .all(function() {
+        	      g.where({type:"/base/gadgets/gadget",
+                              name: g._("name"),
+        		       weight: g._("weight")})
+        	       .tuples(function(result) {
+        		   ko.applyBindings({ipads: result});
+        	       })
+        	  })
+        
+            });
+       });
     </script>
   </head>
 
   <body>
-    <p>
-      <label>User:</label>
-      <input data-bind="value:user"></input>
-    </p>
-    <p>
-      <label>Repo:</label>
-      <input data-bind="value:repo"></input>
-    </p>
-    <p>
-      <input type='button' value='compute' data-bind='click:compute'></input>
-    </p>
-
-    <div id='graph-chart' style="text-align:center"></div>
+    <table data-bind="foreach: ipads">
+     <tr><td data-bind="text:name"></td><td data-bind="text:weight"></td></tr>
+   </table>
   </body>
 
 </html>

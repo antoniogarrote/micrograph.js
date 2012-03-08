@@ -85,7 +85,7 @@ Utils.repeatAsync = function(c,max,floop,fend,env) {
         floop(function(floop,env){
             // avoid stack overflow
             // deadly hack
-            Utils.recur(function(){ Utils.repeat(c+1, max, floop, fend, env); });
+            Utils.recur(function(){ Utils.repeatAsync(c+1, max, floop, fend, env); });
         },env);
     } else {
         fend(env);
@@ -157,15 +157,7 @@ Utils.keys = function(obj) {
 };
 
 Utils.iso8601 = function(date) {
-    function pad(n){
-        return n<10 ? '0'+n : n;
-    }    
-    return date.getUTCFullYear()+'-'
-        + pad(date.getUTCMonth()+1)+'-'
-        + pad(date.getUTCDate())+'T'
-        + pad(date.getUTCHours())+':'
-        + pad(date.getUTCMinutes())+':'
-        + pad(date.getUTCSeconds())+'Z';
+    return date.getTime();
 };
 
 
@@ -220,30 +212,8 @@ Utils.parseStrictISO8601 = function (str) {
 
 
 Utils.parseISO8601 = function (str) {
-    var regexp = "([0-9]{4})(-([0-9]{2})(-([0-9]{2})" +
-        "(T([0-9]{2}):([0-9]{2})(:([0-9]{2})(\.([0-9]+))?)?" +
-        "(Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?";
-    var d = str.match(new RegExp(regexp));
+    return new Date(parseInt(str));
 
-    var offset = 0;
-    var date = new Date(d[1], 0, 1);
-
-    if (d[3]) { date.setMonth(d[3] - 1); }
-    if (d[5]) { date.setDate(d[5]);  }
-    if (d[7]) { date.setHours(d[7]);  }
-    if (d[8]) { date.setMinutes(d[8]);  }
-    if (d[10]) { date.setSeconds(d[10]);  }
-    if (d[12]) { date.setMilliseconds(Number("0." + d[12]) * 1000); }
-    if (d[14]) {
-        offset = (Number(d[16]) * 60) + Number(d[17]);
-        offset *= ((d[15] == '-') ? 1 : -1);
-    }
-
-    offset -= date.getTimezoneOffset();
-    var time = (Number(date) + (offset * 60 * 1000));
-    var toReturn = new Date();
-    toReturn.setTime(Number(time));
-    return toReturn;
 };
 
 Utils.parseISO8601Components = function (str) {
@@ -283,51 +253,7 @@ Utils.parseISO8601Components = function (str) {
 };
 
 Utils.compareDateComponents = function(stra,strb) {
-    var a = Utils.parseISO8601Components(stra);
-    var b = Utils.parseISO8601Components(strb);
-
-    if((a.timezone == null && b.timezone == null) ||
-       (a.timezone != null && b.timezone != null)) {        
-        var da = Utils.parseISO8601(stra);
-        var db = Utils.parseISO8601(strb);
-        
-        if(da.getTime() == db.getTime()) {
-            return 0;
-        } else if(da.getTime() < db.getTime()){
-            return -1;
-        } else {
-            return 1;
-        }
-    } else if (a.timezone != null && b.timezone == null){
-        da = Utils.parseISO8601(stra);
-        db = Utils.parseISO8601(strb);
-        var ta = da.getTime();
-        var tb = db.getTime();
-
-        var offset = 14*60*60;
-
-        if(ta < tb && ta < (tb + offset)) {
-            return -1;
-        } else if(ta > tb && ta > (tb - offset)) {
-            return 1;
-        } else {
-        return null;
-        }
-    } else {
-        da = Utils.parseISO8601(stra);
-        db = Utils.parseISO8601(strb);
-        ta = da.getTime();
-        tb = db.getTime();
-
-        var offset = 14*60*60;
-        if(ta < tb && (ta + offset)  < tb) {
-            return -1;
-        } else if(ta > tb && (ta + offset) > tb) {
-            return 1;
-        } else {
-        return null;
-        }
-    }
+    return stra == strb;
 };
 
 // RDF utils
@@ -464,1288 +390,6 @@ Utils.hashTerm = function(term) {
 };
 
 // end of ./src/js-trees/src/utils.js 
-// exports
-var PriorityQueue = {};
-
-/**
- * @constructor
- * @class PriorityQueue manages a queue of elements with priorities. Default
- * is highest priority first.
- *
- * @param [options] If low is set to true returns lowest first.
- */
-PriorityQueue.PriorityQueue = function(options) {
-    var contents = [];
-    var store = {};
-    var sorted = false;
-    var sortStyle;
-    var maxSize = options.maxSize || 10;
-
-    //noinspection UnnecessaryLocalVariableJS
-    sortStyle = function(a, b) {
-        return store[b].priority - store[a].priority;
-    };
-
-
-    /**
-     * @private
-     */
-    var sort = function() {
-        contents.sort(sortStyle);
-        sorted = true;
-    };
-
-    var self = {
-        debugContents: contents,
-        debugStore: store,
-        debugSort: sort,
-
-        push: function(pointer, object) {
-            if(contents.length === maxSize) {
-                if(!sorted) {
-                    sort();
-                }
-                if(store[pointer] == null) {
-                    delete store[contents[0]];
-                    contents[0] = pointer;
-                    var priority = (store[contents[contents.length - 1]].priority) - 1;
-                    store[pointer] = {object: object, priority: priority};
-                    sorted = false;
-                } else {
-                    priority = (store[contents[contents.length - 1]].priority) - 1;
-                    store[pointer].priority = priority;
-                    sorted = false;
-                }
-            } else if(contents.length === 0){
-                contents.push(pointer);
-                store[pointer] = {object: object, priority: 1000};
-            } else  {
-                priority = (store[contents[contents.length - 1]].priority) - 1;
-                if(store[pointer] == null) {
-                    store[pointer] = {object: object, priority: priority};
-                    contents.push(pointer);
-                } else {
-                    store[pointer].priority = priority;
-                    sorted = false;
-                }
-            }
-        },
-
-        remove: function(pointer) {
-            if(store[pointer] != null) {
-                delete store[pointer];
-                var pos = null;
-                for(var i=0; i<contents.length; i++) {
-                    if(contents[i] === pointer) {
-                        pos = i;
-                        break;
-                    }
-                }
-
-                if(pos != null) {
-                    contents.splice(pos,1);
-                }
-            }
-        },
-
-        fetch: function(pointer) {
-            var obj = store[pointer];
-            if(store[pointer] != null) {
-                if(!sorted) {
-                    sort();
-                }
-                var priority = (store[contents[contents.length - 1]].priority) - 1;
-                store[pointer].priority = priority;
-                sorted = false;
-                return obj.object;
-            } else {
-                return null;
-            }
-        }
-
-    };
-
-    return self;
-};
-
-// end of ./src/js-trees/src/priority_queue.js 
-// exports
-var WebLocalStorageBTree = {};
-
-var left = -1;
-var right = 1;
-
-
-/**
- * @doc
- * Implementation based on <http://www.gossamer-threads.com/lists/linux/kernel/667935>
- *
- */
-
-/**
- * Tree
- *
- * Implements the interface of BinarySearchTree.Tree
- *
- * An implementation of an in memory B-Tree.
- */
-WebLocalStorageBTree.Tree = function(order, name, persistent, cacheMaxSize) {
-    if(arguments.length != 0) {
-        var storage = null;
-        if(persistent === true) {
-            try {
-                storage = window.localStorage;
-                if(storage == null) {
-                    throw("not found");
-                }
-            } catch(e) {
-                throw("Local storage is not present, cannot create persistent storage");
-            }
-        }
-
-        if(storage == null) {
-            storage = (function(){ 
-                var content = {};
-                return { setItem: function(pointer, object) {
-                            content[pointer] = object;
-                        },
-                        getItem: function(pointer) {
-                            return (content[pointer] || null);
-                        },
-                        removeItem: function(pointer) {
-                            delete content[pointer];
-                        },
-                        get: function(i) {
-                            var j=0;
-                            for(var k in content) {
-                                if(i===j) {
-                                    return k;
-                                }
-                                j++;
-                            }
-
-                            return "";
-                        },
-                        length: content.length
-                       };
-            })();
-        }
-
-        this.storage = storage;
-        this.order = order;
-        this.name = name;
-        this.diskManager = new WebLocalStorageBTree.LocalStorageManager(name, storage, cacheMaxSize);
-        this.root = this.diskManager._readRootNode();
-        //this.root = this.diskManager._diskRead("__"+name+"__ROOT_NODE__");
-        if(this.root == null) {
-            this.root = this._allocateNode();
-            this.root.isLeaf = true;
-            this.root.level = 0;
-            this._diskWrite(this.root);
-            this._updateRootNode(this.root);
-            this.root = this.root.pointer;
-        } else {
-            this.root = this.diskManager._diskRead(this.root).pointer;
-        };
-
-        this.comparator = function(a,b) {
-            if(a < b) {
-                return -1;
-            } else if(a > b){
-                return 1;
-            } else {
-                return 0;
-            }
-        };
-        this.merger = null;
-    }
-};
-
-
-/**
- * Creates the new node.
- *
- * This class can be overwritten by different versions of
- * the tree t select the right kind of node to be used
- *
- * @returns the new alloacted node
- */
-WebLocalStorageBTree.Tree.prototype._allocateNode = function() {
-    return new WebLocalStorageBTree.Node();
-};
-
-/**
- * _diskWrite
- *
- * Persists the node to secondary memory.
- */
-WebLocalStorageBTree.Tree.prototype._diskWrite= function(node) {
-    this.diskManager._diskWrite(node);
-};
-
-
-/**
- * _diskRead
- *
- * Retrieves a node from secondary memory using the provided
- * pointer
- */
-WebLocalStorageBTree.Tree.prototype._diskRead = function(pointer) {
-    return this.diskManager._diskRead(pointer);
-};
-
-
-WebLocalStorageBTree.Tree.prototype._diskDelete = function(node) {
-    this.diskManager._diskDelete(node);
-};
-
-/**
- * _updateRootNode
- *
- * Updates the pointer to the root node stored in disk.
- */
-WebLocalStorageBTree.Tree.prototype._updateRootNode = function(node) {
-    this.diskManager._updateRootNode(node);
-    return node;
-};
-
-
-/**
- * search
- *
- * Retrieves the node matching the given value.
- * If no node is found, null is returned.
- */
-WebLocalStorageBTree.Tree.prototype.search = function(key, checkExists) {
-    var searching = true;
-    var node = this._diskRead(this.root);
-
-    while(searching) {
-        var idx = 0;
-        while(idx < node.numberActives && this.comparator(key, node.keys[idx].key) === 1) {
-            idx++;
-        }
-
-        if(idx < node.numberActives && this.comparator(node.keys[idx].key,key) === 0) {
-            if(checkExists != null && checkExists == true) {
-                return true;
-            } else {
-                return node.keys[idx].data;
-            }
-        } else {
-            if(node.isLeaf === true) {
-                searching = false;
-            } else {
-                node = this._diskRead(node.children[idx]);
-            }
-        }
-    }
-
-    return null;
-};
-
-
-/**
- * walk
- * Applies a function to all the nodes key and data in the the
- * tree in key order.
- */
-WebLocalStorageBTree.Tree.prototype.walk = function(f) {
-    this._walk(f,this._diskRead(this.root));
-};
-
-WebLocalStorageBTree.Tree.prototype._walk = function(f,node) {
-    if(node.isLeaf) {
-        for(var i=0; i<node.numberActives; i++) {
-            f(node.keys[i]);
-        }
-    } else {
-        for(var i=0; i<node.numberActives; i++) {
-            this._walk(f,this._diskRead(node.children[i]));
-            f(node.keys[i]);
-        }
-        this._walk(f,this._diskRead(node.children[node.numberActives]));
-    }
-};
-
-/**
- * walkNodes
- * Applies a function to all the nodes in the the
- * tree in key order.
- */
-WebLocalStorageBTree.Tree.prototype.walkNodes = function(f) {
-    this._walkNodes(f,this._diskRead(this.root));
-};
-
-WebLocalStorageBTree.Tree.prototype._walkNodes = function(f,node) {
-    if(node.isLeaf) {
-        f(node);
-    } else {
-        f(node);
-        for(var i=0; i<node.numberActives; i++) {
-            this._walkNodes(f,this._diskRead(node.children[i]));
-        }
-        this._walkNodes(f,this._diskRead(node.children[node.numberActives]));
-    }
-};
-
-/**
- * _splitChild
- *
- * Split the child node and adjusts the parent.
- */
-WebLocalStorageBTree.Tree.prototype._splitChild = function(parent, index, child) {
-    var newChild = this._allocateNode();
-    newChild.isLeaf = child.isLeaf;
-    newChild.level = child.level;
-    newChild.numberActives = this.order - 1;
-
-    // Copy the higher order keys to the new child
-    var newParentChild = child.keys[this.order-1];
-    child.keys[this.order-1] = null;
-
-    for(var i=0; i< this.order-1; i++) {
-	newChild.keys[i]=child.keys[i+this.order];
-	child.keys[i+this.order] = null;
-	if(!child.isLeaf) {
-	    newChild.children[i] = child.children[i+this.order];
-            child.children[i+this.order] = null;
-	}
-    }
-
-    // Copy the last child pointer
-    if(!child.isLeaf) {
-	newChild.children[i] = child.children[i+this.order];
-        child.children[i+this.order] = null;
-    }
-
-    child.numberActives = this.order - 1;
-
-
-    for(i = parent.numberActives + 1; i>index+1; i--) {
-	parent.children[i] = parent.children[i-1];
-    }
-    this._diskWrite(newChild);
-
-    parent.children[index+1] = newChild.pointer;
-
-    for(i = parent.numberActives; i>index; i--) {
-	parent.keys[i] = parent.keys[i-1];
-    }
-
-    parent.keys[index] = newParentChild;
-    parent.numberActives++;
-
-    this._diskWrite(parent);
-    this._diskWrite(child);
-};
-
-/**
- * insert
- *
- * Creates a new node with value key and data and inserts it
- * into the tree.
- */
-WebLocalStorageBTree.Tree.prototype.insert = function(key,data) {
-    var currentRoot = this._diskRead(this.root);
-
-
-    if(currentRoot.numberActives === (2 * this.order - 1)) {
-        var newRoot = this._allocateNode();
-        newRoot.isLeaf = false;
-        newRoot.level = currentRoot.level + 1;
-        newRoot.numberActives = 0;
-        newRoot.children[0] = currentRoot.pointer;
-        this._diskWrite(newRoot);
-
-        this._splitChild(newRoot, 0, currentRoot);
-        this.root = newRoot.pointer;
-        this._updateRootNode(newRoot);
-        this._insertNonFull(newRoot, key, data);
-    } else {
-        this._insertNonFull(currentRoot, key, data);
-    }
-};
-
-/**
- * _insertNonFull
- *
- * Recursive function that tries to insert the new key in
- * in the prvided node, or splits it and go deeper
- * in the BTree hierarchy.
- */
-WebLocalStorageBTree.Tree.prototype._insertNonFull = function(node,key,data) {
-    var idx = node.numberActives - 1;
-
-    while(!node.isLeaf) {
-        while(idx>=0 && this.comparator(key,node.keys[idx].key) === -1) {
-            idx--;
-        }
-        idx++;
-
-        var child = this._diskRead(node.children[idx]);
-        
-        if(child.numberActives === 2*this.order -1) {
-            this._splitChild(node,idx,child);
-            if(this.comparator(key, node.keys[idx].key)===1) {
-                idx++;
-            }
-        }
-        node = this._diskRead(node.children[idx]);
-        idx = node.numberActives -1;
-    }
-
-    while(idx>=0 && this.comparator(key,node.keys[idx].key) === -1) {
-        node.keys[idx+1] = node.keys[idx];
-        idx--;
-    }
-
-    node.keys[idx + 1] = {key:key, data:data};
-    node.numberActives++;
-    this._diskWrite(node);
-};
-
-/**
- * delete
- *
- * Deletes the key from the BTree.
- * If the key is not found, an exception is thrown.
- *
- * @param key the key to be deleted
- * @returns true if the key is deleted false otherwise
- */
-WebLocalStorageBTree.Tree.prototype['delete'] = function(key) {
-    var node = this._diskRead(this.root);
-    var parent = null;
-    var searching = true;
-    var idx = null;
-    var lsibling = null;
-    var rsibling = null;
-    var shouldContinue = true;
-
-    while(shouldContinue === true) {
-        shouldContinue = false;
-        while(searching === true) {
-            i = 0;
-
-            if(node.numberActives === 0) {
-                return false;
-            }
-
-            while(i<node.numberActives && this.comparator(key, node.keys[i].key) === 1) {
-                i++;
-            }
-
-            idx = i;
-
-            if(i<node.numberActives && this.comparator(key, node.keys[i].key) === 0) {
-                searching = false;
-            }
-
-            if(searching === true) {
-
-                if(node.isLeaf === true) {
-                    return false;
-                }
-
-                parent = node;
-                node = this._diskRead(node.children[i]);
-
-                if(node===null) {
-                    return false;
-                }
-
-                if(idx === parent.numberActives) {
-                    lsibling = this._diskRead(parent.children[idx-1]);
-                    rsibling = null;
-                } else if(idx === 0) {
-                    lsibling = null;
-                    rsibling = this._diskRead(parent.children[1]);
-                } else {
-                    lsibling = this._diskRead(parent.children[idx-1]);
-                    rsibling = this._diskRead(parent.children[idx+1]);
-                }
-
-
-                if(node.numberActives === (this.order-1) && parent != null) {
-                    if(rsibling != null && rsibling.numberActives > (this.order-1)) {
-                        // The current node has (t - 1) keys but the right sibling has > (t - 1) keys
-                        this._moveKey(parent,i,left);
-                        node = this._diskRead(node.pointer);
-                    } else if(lsibling != null && lsibling.numberActives > (this.order-1)) {
-                        // The current node has (t - 1) keys but the left sibling has > (t - 1) keys
-                        this._moveKey(parent,i,right);
-                        node = this._diskRead(node.pointer);
-                    } else if(lsibling != null && lsibling.numberActives === (this.order-1)) {
-                        // The current node has (t - 1) keys but the left sibling has (t - 1) keys
-                        node = this._mergeSiblings(parent,i,left);
-                    } else if(rsibling != null && rsibling.numberActives === (this.order-1)){
-                        // The current node has (t - 1) keys but the left sibling has (t - 1) keys
-                        node = this._mergeSiblings(parent,i,right);
-                    }
-                }
-            }
-        }
-
-        //Case 1 : The node containing the key is found and is the leaf node.
-        //Also the leaf node has keys greater than the minimum required.
-        //Simply remove the key
-        if(node.isLeaf && (node.numberActives > (this.order-1))) {
-            this._deleteKeyFromNode(node,idx);
-            return true;
-        }
-
-
-        //If the leaf node is the root permit deletion even if the number of keys is
-        //less than (t - 1)
-        if(node.isLeaf && (node.pointer === this.root)) {
-            this._deleteKeyFromNode(node,idx);
-            return true;
-        }
-
-    try {
-        //Case 2: The node containing the key is found and is an internal node
-        if(node.isLeaf === false) {
-            var tmpNode = null;
-            var tmpNode2 = null;
-
-            if((tmpNode=this._diskRead(node.children[idx])).numberActives > (this.order-1)) {
-                var subNodeIdx = this._getMaxKeyPos(tmpNode);
-                key = subNodeIdx.node.keys[subNodeIdx.index];
-
-                node.keys[idx] = key;
-
-                //this._delete(node.children[idx],key.key);
-                this._diskWrite(node);
-                node = tmpNode;
-                key = key.key;
-                shouldContinue = true;
-                searching = true;
-            } else {
-                if ((tmpNode = this._diskRead(node.children[idx+1])).numberActives >(this.order-1)) {
-                    var subNodeIdx = this._getMinKeyPos(tmpNode);
-                    key = subNodeIdx.node.keys[subNodeIdx.index];
-
-                    node.keys[idx] = key;
-
-                    //this._delete(node.children[idx+1],key.key);
-                    this._diskWrite(node);
-                    node = tmpNode;
-                    key = key.key;
-                    shouldContinue = true;
-                    searching = true;
-                } else {
-                    if((tmpNode = this._diskRead(node.children[idx])).numberActives === (this.order-1) &&
-                       (tmpNode2 = this._diskRead(node.children[idx+1])).numberActives === (this.order-1)) {
-
-                        var combNode = this._mergeNodes(tmpNode, node.keys[idx], tmpNode2);
-                        node.children[idx] = combNode.pointer;
-
-                        idx++;
-                        for(var i=idx; i<node.numberActives; i++) {
-          	            node.children[i] = node.children[i+1];
-          	            node.keys[i-1] = node.keys[i];
-                        }
-                        // freeing unused references
-                        node.children[i] = null;
-                        node.keys[i-1] = null;
-
-                        node.numberActives--;
-                        if (node.numberActives === 0 && this.root === node.pointer) {
-                            this.root = combNode.pointer;
-                            this._updateRootNode(combNode);
-                        }
-
-                        this._diskWrite(node);
-
-                        node = combNode;
-                        shouldContinue = true;
-                        searching = true;
-                    }
-                }
-            }
-        }
-    } catch(e) {
-        console.log("!!!");
-        console.log(e);
-    }
-
-
-        // Case 3:
-	// In this case start from the top of the tree and continue
-	// moving to the leaf node making sure that each node that
-	// we encounter on the way has at least 't' (order of the tree)
-	// keys
-	if(node.isLeaf && (node.numberActives > this.order - 1) && searching===false) {
-            this._deleteKeyFromNode(node,idx);
-	}
-
-        if(shouldContinue === false) {
-            return true;
-        }
-    }
-};
-
-/**
- * _moveKey
- *
- * Move key situated at position i of the parent node
- * to the left or right child at positions i-1 and i+1
- * according to the provided position
- *
- * @param parent the node whose is going to be moved to a child
- * @param i Index of the key in the parent
- * @param position left, or right
- */
-WebLocalStorageBTree.Tree.prototype._moveKey = function (parent, i, position) {
-
-    if (position === right) {
-        i--;
-    }
-
-    //var lchild = parent.children[i-1];
-    var lchild = this._diskRead(parent.children[i]);
-    var rchild = this._diskRead(parent.children[i + 1]);
-
-
-    if (position == left) {
-        lchild.keys[lchild.numberActives] = parent.keys[i];
-        lchild.children[lchild.numberActives + 1] = rchild.children[0];
-        rchild.children[0] = null;
-        lchild.numberActives++;
-
-        parent.keys[i] = rchild.keys[0];
-
-        for (var _i = 1; _i < rchild.numberActives; _i++) {
-            rchild.keys[_i - 1] = rchild.keys[_i];
-            rchild.children[_i - 1] = rchild.children[_i];
-        }
-        rchild.children[rchild.numberActives - 1] = rchild.children[rchild.numberActives];
-        rchild.numberActives--;
-    } else {
-        rchild.children[rchild.numberActives + 1] = rchild.children[rchild.numberActives];
-        for (var _i = rchild.numberActives; _i > 0; _i--) {
-            rchild.children[_i] = rchild.children[_i - 1];
-            rchild.keys[_i] = rchild.keys[_i - 1];
-        }
-        rchild.keys[0] = null;
-        rchild.children[0] = null;
-
-        rchild.children[0] = lchild.children[lchild.numberActives];
-        rchild.keys[0] = parent.keys[i];
-        rchild.numberActives++;
-
-        lchild.children[lchild.numberActives] = null;
-        parent.keys[i] = lchild.keys[lchild.numberActives - 1];
-        lchild.keys[lchild.numberActives - 1] = null;
-        lchild.numberActives--;
-    }
-
-    this._diskWrite(lchild);
-    this._diskWrite(rchild);
-    this._diskWrite(parent);
-};
-
-/**
- * _mergeSiblings
- *
- * Merges two nodes at the left and right of the provided
- * index in the parent node.
- *
- * @param parent the node whose children will be merged
- * @param i Index of the key in the parent pointing to the nodes to merge
- */
-WebLocalStorageBTree.Tree.prototype._mergeSiblings = function (parent, index, pos) {
-    var i, j;
-    var n1, n2;
-
-    if (index === (parent.numberActives)) {
-        index--;
-        n1 = this._diskRead(parent.children[parent.numberActives - 1]);
-        n2 = this._diskRead(parent.children[parent.numberActives]);
-    } else {
-        n1 = this._diskRead(parent.children[index]);
-        n2 = this._diskRead(parent.children[index + 1]);
-    }
-
-    //Merge the current node with the left node
-    var newNode = this._allocateNode();
-    newNode.isLeaf = n1.isLeaf;
-    newNode.level = n1.level;
-
-    for (j = 0; j < this.order - 1; j++) {
-        newNode.keys[j] = n1.keys[j];
-        newNode.children[j] = n1.children[j];
-    }
-
-    newNode.keys[this.order - 1] = parent.keys[index];
-    newNode.children[this.order - 1] = n1.children[this.order - 1];
-
-    for (j = 0; j < this.order - 1; j++) {
-        newNode.keys[j + this.order] = n2.keys[j];
-        newNode.children[j + this.order] = n2.children[j];
-    }
-    newNode.children[2 * this.order - 1] = n2.children[this.order - 1];
-
-    this._diskWrite(newNode);
-    parent.children[index] = newNode.pointer;
-
-    for (j = index; j < parent.numberActives; j++) {
-        parent.keys[j] = parent.keys[j + 1];
-        parent.children[j + 1] = parent.children[j + 2];
-    }
-
-    newNode.numberActives = n1.numberActives + n2.numberActives + 1;
-    parent.numberActives--;
-
-    for (i = parent.numberActives; i < 2 * this.order - 1; i++) {
-        parent.keys[i] = null;
-    }
-
-    if (parent.numberActives === 0 && this.root === parent.pointer) {
-        this.root = newNode.pointer;
-        if (newNode.level) {
-            newNode.isLeaf = false;
-        } else {
-            newNode.isLeaf = true;
-        }
-    }
-
-    this._diskWrite(newNode);
-    if (this.root === newNode.pointer) {
-        this._updateRootNode(newNode);
-    }
-    this._diskWrite(parent);
-    this._diskDelete(n1);
-    this._diskDelete(n2);
-
-    return newNode;
-};
-
-/**
- * _deleteKeyFromNode
- *
- * Deletes the key at position index from the provided node.
- *
- * @param node The node where the key will be deleted.
- * @param index The index of the key that will be deletd.
- * @return true if the key can be deleted, false otherwise
- */
-WebLocalStorageBTree.Tree.prototype._deleteKeyFromNode = function (node, index) {
-    var keysMax = (2 * this.order) - 1;
-    if (node.numberActives < keysMax) {
-        keysMax = node.numberActives;
-    }
-    ;
-
-    var i;
-
-    if (node.isLeaf === false) {
-        return false;
-    }
-
-    var key = node.keys[index];
-
-    for (i = index; i < keysMax - 1; i++) {
-        node.keys[i] = node.keys[i + 1];
-    }
-
-    // cleaning invalid reference
-    node.keys.splice(keysMax - 1, (node.keys.length - (keysMax - 1)));
-    node.numberActives--;
-
-    this._diskWrite(node);
-
-    return true;
-};
-
-WebLocalStorageBTree.Tree.prototype._mergeNodes = function (n1, key, n2) {
-    var newNode;
-    var i;
-
-    newNode = this._allocateNode();
-    newNode.isLeaf = true;
-
-    for (i = 0; i < n1.numberActives; i++) {
-        newNode.keys[i] = n1.keys[i];
-        newNode.children[i] = n1.children[i];
-    }
-    newNode.children[n1.numberActives] = n1.children[n1.numberActives];
-    newNode.keys[n1.numberActives] = key;
-
-    for (i = 0; i < n2.numberActives; i++) {
-        newNode.keys[i + n1.numberActives + 1] = n2.keys[i];
-        newNode.children[i + n1.numberActives + 1] = n2.children[i];
-    }
-    newNode.children[(2 * this.order) - 1] = n2.children[n2.numberActives];
-
-    newNode.numberActives = n1.numberActives + n2.numberActives + 1;
-    newNode.isLeaf = n1.isLeaf;
-    newNode.level = n1.level;
-
-
-    this._diskWrite(newNode);
-    this._diskDelete(n1);
-    this._diskDelete(n2);
-    // @todo
-    // delte old nodes from disk
-    return newNode;
-};
-
-/**
- * audit
- *
- * Checks that the tree data structure is
- * valid.
- */
-WebLocalStorageBTree.Tree.prototype.audit = function (showOutput) {
-    var errors = [];
-    var alreadySeen = [];
-    var that = this;
-
-    var foundInArray = function (data) {
-        for (var i = 0; i < alreadySeen.length; i++) {
-            if (that.comparator(alreadySeen[i], data) === 0) {
-                var error = " !!! duplicated key " + data;
-                if (showOutput === true) {
-                    console.log(error);
-                }
-                errors.push(error);
-            }
-        }
-    };
-
-    var length = null;
-    var that = this;
-    this.walkNodes(function (n) {
-        if (showOutput === true) {
-            console.log("--- Node at " + n.level + " level");
-            console.log(" - pointer: " + n.pointer);
-            console.log(" - leaf? " + n.isLeaf);
-            console.log(" - num actives? " + n.numberActives);
-            console.log(" - keys: ");
-        }
-        for (var i = n.numberActives; i < n.keys.length; i++) {
-            if (n.keys[i] != null) {
-                if (showOutput === true) {
-                    console.log(" * warning : redundant key data");
-                    errors.push(" * warning : redundant key data");
-                }
-            }
-        }
-
-        for (var i = n.numberActives + 1; i < n.children.length; i++) {
-            if (n.children[i] != null) {
-                if (showOutput === true) {
-                    console.log(" * warning : redundant children data");
-                    errors.push(" * warning : redundant key data");
-                }
-            }
-        }
-
-
-        if (n.isLeaf === false) {
-            for (var i = 0; i < n.numberActives; i++) {
-                var maxLeft = that._diskRead(n.children[i]).keys[that._diskRead(n.children[i]).numberActives - 1 ].key;
-                var minRight = that._diskRead(n.children[i + 1]).keys[0].key;
-                if (showOutput === true) {
-                    console.log("   " + n.keys[i].key + "(" + maxLeft + "," + minRight + ")");
-                }
-                if (that.comparator(n.keys[i].key, maxLeft) === -1) {
-                    var error = " !!! value max left " + maxLeft + " > key " + n.keys[i].key;
-                    if (showOutput === true) {
-                        console.log(error);
-                    }
-                    errors.push(error);
-                }
-                if (that.comparator(n.keys[i].key, minRight) === 1) {
-                    var error = " !!! value min right " + minRight + " < key " + n.keys[i].key;
-                    if (showOutput === true) {
-                        console.log(error);
-                    }
-                    errors.push(error);
-                }
-
-                foundInArray(n.keys[i].key);
-                alreadySeen.push(n.keys[i].key);
-            }
-        } else {
-            if (length === null) {
-                length = n.level;
-            } else {
-                if (length != n.level) {
-                    var error = " !!! Leaf node with wrong level value";
-                    if (showOutput === true) {
-                        console.log(error);
-                    }
-                    errors.push(error);
-                }
-            }
-            for (var i = 0; i < n.numberActives; i++) {
-                if (showOutput === true) {
-                    console.log(" " + n.keys[i].key);
-                }
-                foundInArray(n.keys[i].key);
-                alreadySeen.push(n.keys[i].key);
-
-            }
-        }
-
-        if (n.pointer != that.root) {
-            if (n.numberActives > ((2 * that.order) - 1)) {
-                if (showOutput === true) {
-                    var error = " !!!! MAX num keys restriction violated ";
-                }
-                console.log(error);
-                errors.push(error);
-            }
-            if (n.numberActives < (that.order - 1)) {
-                if (showOutput === true) {
-                    var error = " !!!! MIN num keys restriction violated ";
-                }
-                console.log(error);
-                errors.push(error);
-            }
-
-        }
-    });
-
-    return errors;
-};
-
-WebLocalStorageBTree.Tree.prototype.clear = function () {
-    this.diskManager.clear();
-    this.root = this._allocateNode();
-    this.root.isLeaf = true;
-    this.root.level = 0;
-    this._diskWrite(this.root);
-    this._updateRootNode(this.root);
-    this.root = this.root.pointer;
-};
-
-/**
- *  _getMaxKeyPos
- *
- *  Used to get the position of the MAX key within the subtree
- *  @return An object containing the key and position of the key
- */
-WebLocalStorageBTree.Tree.prototype._getMaxKeyPos = function (node) {
-    var node_pos = {};
-
-    while (true) {
-        if (node === null) {
-            break;
-        }
-
-        if (node.isLeaf === true) {
-            node_pos.node = node;
-            node_pos.index = node.numberActives - 1;
-            return node_pos;
-        } else {
-            node_pos.node = node;
-            node_pos.index = node.numberActives - 1;
-            node = this._diskRead(node.children[node.numberActives]);
-        }
-    }
-
-    return node_pos;
-};
-
-/**
- *  _getMinKeyPos
- *
- *  Used to get the position of the MAX key within the subtree
- *  @return An object containing the key and position of the key
- */
-WebLocalStorageBTree.Tree.prototype._getMinKeyPos = function (node) {
-    var node_pos = {};
-
-    while (true) {
-        if (node === null) {
-            break;
-        }
-
-        if (node.isLeaf === true) {
-            node_pos.node = node;
-            node_pos.index = 0;
-            return node_pos;
-        } else {
-            node_pos.node = node;
-            node_pos.index = 0;
-            node = this._diskRead(node.children[0]);
-        }
-    }
-
-    return node_pos;
-};
-
-
-/**
- * Node
- *
- * Implements the interface of BinarySearchTree.Node
- *
- * A Tree node augmented with BTree
- * node structures
- */
-WebLocalStorageBTree.Node = function() {
-    this.numberActives = 0;
-    this.isLeaf = null;
-    this.keys = [];
-    this.children = [];
-    this.level = 0;
-};
-
-/**
- * LocalStorageManager
- *
- * Handle read/writes in the local storage object.
- * In this implementation the pointers are just the keys in
- * the local storage object.
- */
-WebLocalStorageBTree.LocalStorageManager  = function(name,storage, maxSize) {
-    this.name = name;
-    this.storage = storage;
-    this.maxSize = maxSize;
-    this.bufferCache = new PriorityQueue.PriorityQueue({"maxSize": maxSize});
-    this.counter = this.storage.getItem("__"+this.name+"__ID_COUNTER__") || 0;
-};
-
-/**
- * Cleans all data in the local storage
- */
-WebLocalStorageBTree.LocalStorageManager.prototype.clear = function() {
-    var localStorageLength = this.storage.length;
-    var keysToDelete = [];
-
-    for(var i=0; i<localStorageLength; i++) {        
-        // number of elments changes, always get the first key
-        var key = this.storage.key(i);
-        if(key.indexOf(this.name) == 0 || key.indexOf("__"+this.name)==0) {
-            keysToDelete.push(key);
-        }
-    }
-
-    for(var i=0; i<keysToDelete.length; i++) {
-        this.storage.removeItem(keysToDelete[i]);
-    }
-
-
-    this.bufferCache = new PriorityQueue.PriorityQueue({"maxSize": this.maxSize});
-};
-
-/**
- * Generates a new index for b-tree nodes using
- * the b-tree name as a namespace. This is done
- * to avoid collissions in the local storage hash.
- */
-WebLocalStorageBTree.LocalStorageManager.prototype._genIndex = function() {
-    var newId = this.name + this.counter;
-    this.counter++;
-    this.storage.setItem("__"+this.name+"__ID_COUNTER__", this.counter);
-    return newId;
-};
-
-/**
- * Returns the object stored in local storage using the provided reference
- */
-WebLocalStorageBTree.LocalStorageManager.prototype._diskRead = function (pointer) {
-    if (typeof(pointer) === 'object') {
-        pointer = pointer.pointer;
-    }
-    var node = this.bufferCache.fetch(pointer);
-    //var node = null;
-    if (node == null) {
-        var node = this.storage.getItem(pointer);
-        if (node != null) {
-            node = this._decode(node);
-            //node = JSON.parse(node)
-            node.pointer = pointer;
-            this.bufferCache.push(pointer, node);
-        }
-    }
-
-    return node;
-};
-
-
-/**
- * Returns the object stored in local storage using the provided reference
- */
-WebLocalStorageBTree.LocalStorageManager.prototype._diskWrite = function(node) {
-    if(node.pointer == null) {
-        // create
-        node.pointer = this._genIndex();
-    }
-
-    var origChildren = node.children;
-    var childPointers = [];
- 
-    if(node.isLeaf === false) {
-        //for(var i=0; i<(node.numberActives+1); i++) {
-        for(var i=0; i<(origChildren.length); i++) {
-            if(origChildren[i]==null) {
-                childPointers.push(null);                
-            } else if(typeof(origChildren[i]) === 'object') {
-                //this._diskWrite(origChildren[i]);
-                childPointers.push(origChildren[i].pointer);
-            } else {
-                childPointers.push(origChildren[i]);
-            }
-        }
-    }
-    node.children = childPointers;
-
-    this.storage.setItem(node.pointer, this._encode(node));
-    //this.storage.setItem(node.pointer, JSON.stringify(node));
-    //this.storage.setItem(node.pointer, node);
-    node.children = origChildren;
-    this.bufferCache.push(node.pointer, node);
-};
-
-WebLocalStorageBTree.LocalStorageManager.prototype._diskDelete = function(node) {
-    this.storage.removeItem(node.pointer);
-    this.bufferCache.remove(node.pointer);
-};
-
-WebLocalStorageBTree.LocalStorageManager.prototype._updateRootNode = function(node) {
-    if(node.pointer) {
-        this.storage.setItem("__"+this.name+"__ROOT_NODE__",node.pointer);
-    } else {
-        throw "Cannot set as root of the b-tree a node without pointer";
-    }
-};
-
-WebLocalStorageBTree.LocalStorageManager.prototype._readRootNode = function() {
-    var pointer = this.storage.getItem("__"+this.name+"__ROOT_NODE__");
-    if(pointer == null) {
-        return null;
-    } else {
-        return this._diskRead(pointer);
-    }
-};
-
-WebLocalStorageBTree.LocalStorageManager.prototype._encode = function(node) {
-    //console.log("<<");
-    //console.log(node);
-    var encoded = ""+node.numberActives;
-    encoded = encoded+":"+node.pointer;
-    encoded = encoded+":"+node.level;
-    encoded = encoded+":"+(node.isLeaf ? 1 : 0);
-    var numKeys = 0;
-    var keys = "";
-    for(var i=0; i<node.keys.length; i++) {
-        if(node.keys[i] != null) {          
-            if(typeof(node.keys[i].key) === 'number') {
-                keys = keys+":"+node.keys[i].key;
-            } else {
-                var keyStr = "_"+(node.keys[i].key['subject']||"")+"_"+(node.keys[i].key['predicate']||"")+"_"+(node.keys[i].key['object']||"")+"_"+(node.keys[i].key['graph']||"");
-                keys = keys+":"+keyStr;
-            }
-
-            if(node.keys[i].data==null) {
-                keys = keys+":n:";                
-            } else if(typeof(node.keys[i].data)=='string') {
-                keys = keys+":s:"+(node.keys[i].data);
-            } else if(typeof(node.keys[i].data)=='number') {
-                if(node.keys[i] % 1 ==0) {
-                    keys = keys+":i:"+(node.keys[i].data);
-                } else {
-                    keys = keys+":f:"+(node.keys[i].data);
-                }
-            } else {
-                keys = keys+":o:"+(JSON.stringify(node.keys[i].data).replace(":","&colon;"));
-            }
-            numKeys++;
-        }
-    }
-    encoded = encoded+":"+numKeys+keys;
-    if(node.isLeaf === false) {
-
-        var children = "";
-        var numChildren = 0;       
-
-        for(var i=0; i<node.children.length; i++) {
-            if(node.children[i] != null) {
-                children = children+":"+node.children[i];
-                numChildren++;
-            }
-        }
-
-        encoded = encoded+":"+numChildren+children;        
-    }
-    //console.log("<< "+encoded);
-    return encoded;
-};
-
-WebLocalStorageBTree.LocalStorageManager.prototype._decode = function(encodedNode) {
-    //console.log(">> "+encodedNode);
-    var node =  new WebLocalStorageBTree.Node();
-    var parts = encodedNode.split(":");
-    
-    //encoded = ""+node.numberActives;
-    node.numberActives = parseInt(parts[0]);
-    //encoded = encoded+":"+node.pointer;
-    node.pointer = parts[1];
-    //encoded = encoded+":"+node.level;
-    node.level = parseInt(parts[2]);
-    //encoded = encoded+":"+(node.isLeaf ? 1 : 0);
-    if(parts[3] === '1') {
-        node.isLeaf = true;
-    } else {
-        node.isLeaf = false;
-    }
-
-    var numKeys = parseInt(parts[4]);
-    var counter = 5;
-    var key, type, data;
-    for(var i=0; i<numKeys; i++) {
-        key = parts[counter];
-        if(key[0]=="_") {
-            var kparts = key.split("_");
-            key = {'subject': (parseInt(kparts[1])||null), 
-                   'predicate': (parseInt(kparts[2])||null), 
-                   'object': (parseInt(kparts[3])||null),
-                   'graph': (parseInt(kparts[4]||null)) };
-
-        } else {
-            key = parseInt(parts[counter]);
-        }
-        type = parts[counter+1];
-        data = parts[counter + 2];
-
-        if(type === 'n') {
-            data = undefined
-        } else if(type === 'i') {
-            data = parseInt(data);
-        } else if(type === 'f') {
-            data = parseFloat(data);
-        } else if(type === 'o') {
-            data = JSON.parse(data.replace("&colon;",":"));
-        }
-
-        node.keys.push({ "key": key, "data":data});
-
-
-        counter = counter+3;
-    }
-
-    if(node.isLeaf === false) {        
-        var numChildren = parseInt(parts[counter]);
-        counter++;
-        for(var i=0; i<numChildren; i++) {
-            node.children[i] = parts[counter];
-            counter++;
-        }
-    }
-
-    //console.log(" >> ");
-    //console.log(node);
-    return node;
-};
-
-
-// end of ./src/js-trees/src/web_local_storage_b_tree.js 
 // exports
 var InMemoryBTree = {};
 
@@ -2937,454 +1581,6 @@ QuadBackend.QuadBackend.prototype['delete'] = function (quad, callback) {
 };
 
 // end of ./src/js-rdf-persistence/src/quad_backend.js 
-// exports
-var WebLocalStorageLexicon = {};
-
-
-/**
- * Temporal implementation of the lexicon
- */
-
-WebLocalStorageLexicon.Lexicon = function(callback,name){
-    this.name = name || "";
-    this.storage = null;
-
-    try {
-        this.storage = window.localStorage;
-    } catch(e) { }
-
-    if(this.storage == null) {
-        this.storage = { //content: {},
-            setItem: function(pointer, object) {
-                //nop
-            },
-            getItem: function(pointer) {
-                return null;
-            },
-            removeItem: function(pointer) {
-                //nop
-            },
-            key: function(index) {
-                return "";
-            },
-            length: 0
-        };
-    }
-
-    // these hashes will be used as cachés
-    this.uriToOID = {};
-    this.OIDToUri = {};
-
-    this.literalToOID = {};
-    this.OIDToLiteral = {};
-
-    this.blankToOID = {};
-    this.OIDToBlank = {};
-
-    this.defaultGraphOid = 0;
-
-    this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
-    this.defaultGraphUriTerm = {"token": "uri", "prefix": null, "suffix": null, "value": this.defaultGraphUri, "oid": this.defaultGraphOid};
-    this.oidCounter = parseInt(this.storage.getItem(this.pointer("oidCounter"))) || 1;
-
-    // create or restor the hash of known graphs
-    if(this.storage.getItem(this.pointer("knownGraphs"))==null) {
-        this.knownGraphs = {};
-        this.storage.setItem(this.pointer("knownGraphs"), JSON.stringify(this.knownGraphs));
-    } else {
-        this.knownGraphs = JSON.parse(this.storage.getItem(this.pointer("knownGraphs")));
-    }
-    
-    if(callback != null) {
-        callback(this);
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.updateAfterWrite = function() {
-    this.storage.setItem(this.pointer("oidCounter"),""+this.oidCounter);
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.pointer = function (hashName, val) {
-    if (hashName == "uriToOID") {
-        hashName = "uo";
-    } else if (hashName == "OIDToUri") {
-        hashName = "ou";
-    } else if (hashName == "literalToOID") {
-        hashName = "lo";
-    } else if (hashName == "OIDToLiteral") {
-        hashName = "ok";
-    } else if (hashName == "blankToOID") {
-        hashName = "bo";
-    } else if (hashName == "OIDToBlank") {
-        hashName = "ob";
-    }
-
-    if (val == null) {
-        return this.name + "_l_" + hashName;
-    } else {
-        return this.name + "_l_" + hashName + "_" + val;
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.clear = function() {
-    this.uriToOID = {};
-    this.OIDToUri = {};
-    this.literalToOID = {};
-    this.OIDToLiteral = {};
-    this.blankToOID = {};
-    this.OIDToBlank = {};
-    var localStorageLength = this.storage.length;
-    var lexiconPrefix = this.name+"_l_";
-    var keysToDelete = [];
-
-    for(var i=0; i<localStorageLength; i++) {        
-        // number of elments changes, always get the first key
-        var key = this.storage.key(i);
-        if(key.indexOf(lexiconPrefix) == 0) {
-            keysToDelete.push(key);
-        }
-    }
-
-    for(var i=0; i<keysToDelete.length; i++) {
-        this.storage.removeItem(keysToDelete[i]);
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.registerGraph = function(oid){
-    if(oid != this.defaultGraphOid) {
-        this.knownGraphs[oid] = true;
-        this.storage.setItem(this.pointer("knownGraphs"),JSON.stringify(this.knownGraphs));
-    }
-    return true;
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.registeredGraphs = function(shouldReturnUris) {
-    var acum = [];
-
-    for(var g in this.knownGraphs) {
-        if(shouldReturnUris === true) {
-            acum.push(this.retrieve(g));
-        } else {
-            acum.push(g);
-        }
-    }
-    return acum;
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.registerUri = function(uri) {
-    if(uri === this.defaultGraphUri) {
-        return(this.defaultGraphOid);
-    } else if(this.uriToOID[uri] == null){
-        var fromStorage = this.storage.getItem(this.pointer("uriToOID",uri));
-        if(fromStorage == null) {
-            var oid = this.oidCounter;
-            var oidStr = 'u'+oid;
-            this.oidCounter++;
-
-            this.uriToOID[uri] =[oid, 0];
-            this.OIDToUri[oidStr] = uri;
-
-            this.storage.setItem(this.pointer("uriToOID", uri), oid + ":" + 0);
-            this.storage.setItem(this.pointer("OIDToUri", oidStr), uri);
-            return(oid);
-        } else {
-            var parts = fromStorage.split(":");
-            var oid = parseInt(parts[0]);
-            var oidStr = 'u'+oid;
-            var counter = parseInt(parts[1])+1;
-
-            this.uriToOID[uri] = [oid, counter];
-            this.OIDToUri[oidStr] = uri;
-            this.storage.setItem(this.pointer("uriToOID",uri), oid+":"+0);
-
-            return(oid);
-        }
-    } else {
-        var oidCounter = this.uriToOID[uri];
-        var oid = oidCounter[0];
-        var counter = oidCounter[1] + 1;
-        this.uriToOID[uri] = [oid, counter];
-        this.storage.setItem(this.pointer("uriToOID",uri), oid+":"+counter);
-        return(oid);
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.resolveUri = function(uri) {
-    if(uri === this.defaultGraphUri) {
-        return(this.defaultGraphOid);
-    } else {
-        var oidCounter = this.uriToOID[uri];
-        if(oidCounter != null) {
-            return(oidCounter[0]);
-        } else {
-            var fromStorage = this.storage.getItem(this.pointer("uriToOID",uri));
-            if(fromStorage == null) {
-                return(-1);
-            } else {
-                var parts = fromStorage.split(":");
-                var oid = parseInt(parts[0]);
-                var oidStr = 'u'+oid;
-                var counter = parseInt(parts[1]);
-                this.uriToOID[uri] = [oid,counter];
-                this.OIDToUri[oidStr] = uri;
-                return(oid);
-            }
-        }
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.resolveUriCost = function(uri) {
-    if(uri === this.defaultGraphUri) {
-        return(this.defaultGraphOid);
-    } else {
-        var oidCounter = this.uriToOID[uri];
-        if(oidCounter != null) {
-            return(oidCounter[1]);
-        } else {
-            return(-1);
-        }
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.registerBlank = function(label) {
-    var oid = this.oidCounter;
-    this.oidCounter++;
-    var oidStr = ""+oid;
-    this.storage.setItem(this.pointer("OIDToBlank",oidStr),true);
-    this.OIDToBlank[oidStr] = true;
-    
-    return(oidStr);
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.resolveBlank = function(label) {
-    var oid = this.oidCounter;
-    this.oidCounter++;
-    return(""+oid);
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.resolveBlankCost = function(label) {
-    return 0;
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.registerLiteral = function(literal) {
-    if(this.literalToOID[literal] == null){
-        var fromStorage = this.storage.getItem(this.pointer("literalToOID",literal));
-        if(fromStorage==null) {
-            var oid = this.oidCounter;
-            var oidStr =  'l'+ oid;
-            this.oidCounter++;
-
-            this.literalToOID[literal] = [oid, 0];
-            this.OIDToLiteral[oidStr] = literal;
-
-            this.storage.setItem(this.pointer("literalToOID",literal), oid+":"+0);
-            this.storage.setItem(this.pointer("OIDToLiteral",oidStr), literal);
-            return(oid);
-        } else {
-            var oidCounter = fromStorage.split(":");
-            var oid = parseInt(oidCounter[0]);
-            var counter = parseInt(oidCounter[1]) + 1;
-            this.literalToOID[literal] = [oid, counter];
-            this.storage.setItem(this.pointer("literalToOID",literal), oid+":"+counter);
-            return(oid);
-        }
-    } else {
-        var oidCounter = this.literalToOID[literal];
-        var oid = oidCounter[0];
-        var counter = oidCounter[1] + 1;
-        this.storage.setItem(this.pointer("literalToOID",literal), oid+":"+counter);
-        this.literalToOID[literal] = [oid, counter];
-        return(oid);
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.resolveLiteral = function (literal) {
-    var oidCounter = this.literalToOID[literal];
-    if (oidCounter != null) {
-        return(oidCounter[0]);
-    } else {
-        var fromStorage = this.storage.getItem(this.pointer("literalToOID", literal));
-        if (fromStorage != null) {
-            oidCounter = fromStorage.split(":");
-            var oid = parseInt(oidCounter[0]);
-            var counter = parseInt(oidCounter[1]);
-            var oidStr = 'l' + oid;
-            this.literalToOID[literal] = [oid, counter];
-            this.OIDToLiteral[oidStr] = literal;
-            return(oid);
-        } else {
-            return(-1);
-        }
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.resolveLiteralCost = function (literal) {
-    var oidCounter = this.literalToOID[literal];
-    if (oidCounter != null) {
-        return(oidCounter[1]);
-    } else {
-        return(0);
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.parseLiteral = function(literalString) {
-    var parts = literalString.lastIndexOf("@");
-    if(parts!=-1 && literalString[parts-1]==='"') {
-        var value = literalString.substring(1,parts-1);
-        var lang = literalString.substring(parts+1, literalString.length);
-        return {token: "literal", value:value, lang:lang};
-    }
-
-    var parts = literalString.lastIndexOf("^^");
-    if(parts!=-1 && literalString[parts-1]==='"' && literalString[parts+2] === '<' && literalString[literalString.length-1] === '>') {
-        var value = literalString.substring(1,parts-1);
-        var type = literalString.substring(parts+3, literalString.length-1);
-
-        return {token: "literal", value:value, type:type};
-    }
-
-    var value = literalString.substring(1,literalString.length-1);
-    return {token:"literal", value:value};
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.parseUri = function(uriString) {
-    return {token: "uri", value:uriString};
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.retrieve = function(oid) {
-    var fromStorage;
-    try {
-        if(oid === this.defaultGraphOid) {
-            return({ token: "uri", 
-                     value:this.defaultGraphUri,
-                     prefix: null,
-                     suffix: null,
-                     defaultGraph: true });
-        } else {
-          var maybeUri = this.OIDToUri['u'+oid];
-          if(maybeUri!=null) {
-              return(this.parseUri(maybeUri));
-          } else {
-              var maybeLiteral = this.OIDToLiteral['l'+oid];
-              if(maybeLiteral!=null) {
-                  return(this.parseLiteral(maybeLiteral));
-              } else {
-                  var maybeBlank = this.OIDToBlank[""+oid];
-                  if(maybeBlank!=null) {
-                      return({token:"blank", value:"_:"+oid});
-                  } else {
-                      // uri
-                      maybeUri = this.storage.getItem(this.pointer("OIDToUri","u"+oid));
-                      if(maybeUri != null) {
-                          this.OIDToUri["u"+oid] = maybeUri;
-                          fromStorage = this.storage.getItem(this.pointer("uriToOID", maybeUri));
-                          var parts = fromStorage.split(":");
-                          var counter = parseInt(parts[1]);
-                          this.uriToOID[maybeUri] = [oid,counter];
-                          return(this.parseUri(maybeUri));
-                      } else {
-                          // literal
-                          maybeLiteral = this.storage.getItem(this.pointer("OIDToLiteral","l"+oid));
-                          if(maybeLiteral != null) {
-                              this.OIDToLiteral["l"+oid] = maybeLiteral;
-                              fromStorage = this.storage.getItem(this.pointer("literalToOID",maybeLiteral));
-                              var oidCounter = fromStorage.split(":");
-                              var oid = parseInt(oidCounter[0]);
-                              var counter = parseInt(oidCounter[1]);
-                              this.literalToOID[maybeLiteral] = [oid, counter];
-                              return(this.parseLiteral(maybeLiteral));
-                          } else {
-                              // blank
-                              maybeBlank = this.storage.getItem(this.pointer("OIDToBlank",""+oid));
-                              if(maybeBlank != null) {
-                                  this.OIDToBlank[""+oid] = true;
-                                  return({token:"blank", value:"_:"+oid});
-                              } else {
-                                  throw("Null value for OID");
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-        }
-    } catch(e) {
-        console.log("error in lexicon retrieving OID:");
-        console.log(oid);
-        if(e.message) {
-            console.log(e.message); 
-        }
-        if(e.stack) {
-            console.log(e.stack);
-        }
-        throw new Error("Unknown retrieving OID in lexicon:"+oid);
-
-    }
-};
-
-
-WebLocalStorageLexicon.Lexicon.prototype.unregister = function (quad, key) {
-    try {
-        this.unregisterTerm(quad.subject.token, key.subject);
-        this.unregisterTerm(quad.predicate.token, key.predicate);
-        this.unregisterTerm(quad.object.token, key.object);
-        if (quad.graph != null) {
-            this.unregisterTerm(quad.graph.token, key.graph);
-        }
-        return(true);
-    } catch (e) {
-        console.log("Error unregistering quad");
-        console.log(e.message);
-        return(false);
-    }
-};
-
-WebLocalStorageLexicon.Lexicon.prototype.unregisterTerm = function (kind, oid) {
-    if (kind === 'uri') {
-        if (oid != this.defaultGraphOid) {
-            var oidStr = 'u' + oid;
-            var uri = this.OIDToUri[oidStr];     // = uri;
-            var oidCounter = this.uriToOID[uri]; // =[oid, 0];
-
-            var counter = oidCounter[1];
-            if ("" + oidCounter[0] === "" + oid) {
-                if (counter === 0) {
-                    delete this.OIDToUri[oidStr];
-                    delete this.uriToOID[uri];
-                    // delete the graph oid from known graphs
-                    // in case this URI is a graph identifier
-                    delete this.knownGraphs[oid];
-                } else {
-                    this.uriToOID[uri] = [oid, counter - 1];
-                }
-            } else {
-                throw("Not matching OID : " + oid + " vs " + oidCounter[0]);
-            }
-        }
-    } else if (kind === 'literal') {
-        this.oidCounter++;
-        var oidStr = 'l' + oid;
-        var literal = this.OIDToLiteral[oidStr];  // = literal;
-        var oidCounter = this.literalToOID[literal]; // = [oid, 0];
-
-        var counter = oidCounter[1];
-        if ("" + oidCounter[0] === "" + oid) {
-            if (counter === 0) {
-                delete this.OIDToLiteral[oidStr];
-                delete this.literalToOID[literal];
-            } else {
-                this.literalToOID[literal] = [oid, counter - 1];
-            }
-        } else {
-            throw("Not matching OID : " + oid + " vs " + oidCounter[0]);
-        }
-
-    } else if (kind === 'blank') {
-        delete this.OIDToBlank["" + oid];
-    }
-};
-
-// end of ./src/js-rdf-persistence/src/web_local_storage_lexicon.js 
 // exports
 var Lexicon = {};
 
@@ -5101,7 +3297,7 @@ QueryFilters.effectiveTypeValue = function(val){
             // plain literal -> just manipulate the string
             return val.value;
         } else {
-            return val.value
+            return val.value;
         }
     } else {
         // @todo
@@ -5210,7 +3406,7 @@ QueryFilters.runEqualityFunction = function(op1, op2, bindings, queryEngine, dat
             return QueryFilters.ebvFalse();
         }
 
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
+        var comp = op1.value == op2.value;
         if(comp != null) {
             if(comp == 0) {
                 return QueryFilters.ebvTrue();
@@ -5775,7 +3971,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
     } else {
         var ops = [];
         for(var i=0; i<args.length; i++) {
-            ops.push(QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env))
+            ops.push(QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env));
         }
 
         var fun = Utils.lexicalFormBaseUri(iriref, env);
@@ -5947,12 +4143,12 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }            
         } else if(fun == "http://www.w3.org/2001/XMLSchema#dateTime" || fun == "http://www.w3.org/2001/XMLSchema#date") { 
-            from = ops[0];
+            var from = ops[0];
             if(from.type == "http://www.w3.org/2001/XMLSchema#dateTime" || from.type == "http://www.w3.org/2001/XMLSchema#date") {
                 return from;
             } else if(from.type == "http://www.w3.org/2001/XMLSchema#string" || from.type == null) {
                 try {
-                    from.value = Utils.iso8601(Utils.parseStrictISO8601(from.value));
+                    from.value = Utils.iso8601(from.value);
                     from.type = fun;
                     return from;
                 } catch(e) {
@@ -7493,6 +5689,8 @@ QueryEngine.QueryEngine.prototype.groupSolution = function(bindings, group, data
 QueryEngine.QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern, env) {
     if(pattern.kind === "BGP") {
         return this.executeAndBGP(projection, dataset, pattern, env);
+    } else if(pattern.kind === "UNION") {
+        return this.executeUNION(projection, dataset, pattern.value, env);            
     } else if(pattern.kind === "JOIN") {
         return this.executeJOIN(projection, dataset, pattern, env);            
     } else if(pattern.kind === "LEFT_JOIN") {
@@ -7639,6 +5837,34 @@ QueryEngine.QueryEngine.prototype.executeZeroOrMorePath = function(pattern, data
     } else {
 	throw "Kind of path not supported!";
     }
+};
+
+QueryEngine.QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env) {
+    var setQuery1 = patterns[0];
+    var setQuery2 = patterns[1];
+    var set1 = null;
+    var set2 = null;
+
+    if(patterns.length != 2) {
+        throw("SPARQL algebra UNION with more than two components");
+    }
+
+    var that = this;
+    var sets = [];
+
+    set1 = that.executeSelectUnit(projection, dataset, setQuery1, env);
+    if(set1==null) {
+        return null;
+    }
+
+    set2 = that.executeSelectUnit(projection, dataset, setQuery2, env);
+    if(set2==null) {
+        return null;
+    }
+
+    var result = QueryPlan.unionBindings(set1, set2);
+    result = QueryFilters.checkFilters(patterns, result, false, dataset, env, that);
+    return result;
 };
 
 QueryEngine.QueryEngine.prototype.executeAndBGP = function(projection, dataset, patterns, env) {
@@ -8320,7 +6546,8 @@ Callbacks.CallbacksBackend.prototype.startGraphModification = function() {
 };
 
 Callbacks.CallbacksBackend.prototype.nextGraphModification = function(event, quad) {
-    this.updateInProgress[event].push(quad);
+    if(this.updateInProgress)
+	this.updateInProgress[event].push(quad);
 };
 
 Callbacks.CallbacksBackend.prototype.endGraphModification = function(callback) {
@@ -8744,6 +6971,7 @@ Utils.normalizeUnicodeLiterals = function(toNormalize) {
 // QL
 MicrographQL.base_uri = "http://rdfstore-js.org/micrographql/graph#";
 MicrographQL.prefix = "mql";
+MicrographQL.NIL = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil";
 
 MicrographQL.counter = 0;
 
@@ -8751,11 +6979,11 @@ MicrographQL.filterNames = {'$eq':true, '$lt':true, '$gt':true, '$neq':true, '$l
 
 MicrographQL.newContext = function(isQuery) {
     return {variables: [], isQuery:isQuery, quads:[], varsMap: {},   
-	    filtersMap: {}, inverseMap:{}, nodes: true, optionals: []}
+	    filtersMap: {}, inverseMap:{}, nodes: true, optionals: []};
 };
 
 MicrographQL.isFilter = function(val) {
-    if(typeof(val) !== 'object' || val.constructor === Array) {
+    if(val===null || typeof(val) !== 'object' || val.constructor === Array) {
 	return false;
     } else {
 	for(var p in val) {
@@ -8838,8 +7066,8 @@ MicrographQL.parseFilter = function(predicate, filterVariable, expression) {
 	if(typeof(value) !== 'object' || value.constructor !== Array) {
 	    value = [value];
 	}
-	var acum = [];
-	for(var i=0; i<value.length; i++) {
+	acum = [];
+	for(i=0; i<value.length; i++) {
 	    acum.push(MicrographQL.parseFilter(predicate, filterVariable, value[i]));
 	}
 	return {"token": "expression",
@@ -8850,7 +7078,7 @@ MicrographQL.parseFilter = function(predicate, filterVariable, expression) {
 	    return {
                 "token": "expression",
                 "expressionType": "irireforfunction",
-                "iriref": MicrographQL.parseURI(MicrographQL.base_uri+expression['$id'])
+                "iriref": MicrographQL.parseURI((MicrographQL.isUri(expression['$id']) ? expression['$id'] : MicrographQL.base_uri+expression['$id']))
 	    };
 	} else {
 	    var literal =  MicrographQL.parseLiteral(expression);
@@ -8875,7 +7103,7 @@ MicrographQL.parseFilter = function(predicate, filterVariable, expression) {
 };
 
 MicrographQL.nextVariable = function() {
-    var variable = "id"+MicrographQL.counter;
+    var variable = "id__mg__"+MicrographQL.counter;
     MicrographQL.counter++;
     return variable;
 };
@@ -8897,8 +7125,39 @@ MicrographQL.parseURI = function(value) {
     }
 };
 
+MicrographQL.parsePath = function(value) {
+    var pathParts = value.split("/");
+    var values = [], token, modifier, pathComponent;
+    for(var i=0; i<pathParts.length; i++) {
+	value = pathParts[i];
+	modifier = null;
+	if(value.indexOf("*") === value.length-1) {
+	    modifier = "*";
+	    value = value.substring(0,value.length-1);
+	} else if(value.indexOf("?") === value.length-1) {
+	    modifier = "?";
+	    value = value.substring(0,value.length-1);
+	} else if(value.indexOf("+") === value.length-1) {
+	    modifier = "+";
+	    value = value.substring(0,value.length-1);
+	}
+
+	token = MicrographQL.parseURI(value);
+	if(modifier != null)
+	    token = {'token':'path', 'kind':'element', 'value':token, 'modifier': modifier};
+
+	values.push(token);
+    }
+
+    return {"token": "path",
+            "kind": "sequence",
+	    "value": values};
+};
+
 MicrographQL.parseLiteral = function(value) {
-    if(typeof(value) === 'string') {
+    if(value === null) {
+	return {'token': 'uri', 'value': MicrographQL.NIL};
+    } else if(typeof(value) === 'string') {
 	return {'token': 'literal', 'value': value, 'lang':null, 'type':null };
     } else if(typeof(value) === 'boolean') {
 	return {'token': 'literal', 'value': ""+value, 'type':'http://www.w3.org/2001/XMLSchema#boolean', 'lang':null};
@@ -8931,21 +7190,38 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 		expression['$id'] = "object"+(MicrographQL.counter-1); // the previous ID
 	} else {
 	    if(expression['$id']['token'] ==='var') {
-		// this node is an inverse relationship
+		// this node might be an inverse relationship
+		// or can be set to a var by a tuple or path query
 		subject = expression['$id'];
-		if(!context.nodes)
+		if(!context.nodes && subject.value.indexOf("id__mg__") == -1) // this is a dirty fix, how to tell if the var is generated or provided?
 		    context.variables.push(subject);
 	    } else {
-		subject = MicrographQL.parseURI(MicrographQL.base_uri+expression['$id']);
+		if(MicrographQL.isUri(expression['$id']))
+		    subject = MicrographQL.parseURI(expression['$id']);
+  	        else
+		    subject = MicrographQL.parseURI(MicrographQL.base_uri+expression['$id']);
+	    }
+
+	    if(context.isQuery && subject.token !== 'var') {
+		var filterVariable = nextVariable;
+		var variableToken = {'token':'var', 'value': filterVariable};
+		var filterString = MicrographQL.parseFilter(predicate,variableToken, {$eq: {'$id': expression['$id']}});
+		context.variables.push(variableToken);
+		context.varsMap[filterVariable] = nextVariable;
+		context.filtersMap[filterVariable] = filterString;
+		subject = variableToken;
 	    }
 	}
 
 	if(expression['$from'] == null && from != null)
 	    expression['$from'] = from;
-	if(expression['$state'] == null && state != null)
+
+	if(expression['$state'] == null && (state === 'created' || state === 'loaded')) 
 	    expression['$state'] = state;
+	else if(expression['$state'] == null && state === 'dirty') 
+	    expression['$state'] = 'created';
 	else if(expression['$state'] === 'loaded' && state === 'dirty') 
-	    expression['$state'] = 'dirty'
+	    expression['$state'] = 'dirty';
 
 	context.varsMap[nextVariable] = subject.value;
     } else {
@@ -8962,7 +7238,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
     
     var predicate, object, result, linked, linkedId, inverseLinks, linkedProp, detectEmpty = true;
     for(var p in expression) {
-	if(expression[p] != null) {
+	if(expression[p] !== undefined) {
 	    if(p!=='$id') {
 		detectEmpty = false;
 		if(p.indexOf("$in") == (p.length-3) && p.indexOf("$in") !== -1) {
@@ -8986,21 +7262,32 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 			idInverseMap = invLinkedId.value;
 		    }
 
-		    linked[linkedProp] = {'$id':invLinkedId};
-		    result = MicrographQL.parseBGP(linked, context, false, graph, from, state);
-
-		    inverseLinks = context.inverseMap[idInverseMap] || {};
-		    context.inverseMap[idInverseMap] = inverseLinks;
-
-		    var linked = inverseLinks[linkedProp] || [];
-		    inverseLinks[linkedProp] = linked;
-		    if(result[0].token === 'uri') {
-			linked.push(result[0].value.split(MicrographQL.base_uri)[1]);
+		    var linkedArray;
+		    if(linked.constructor !== Array) {
+			linkedArray = [linked];
 		    } else {
-			linked.push(result[0].value);
+			linkedArray = linked;
 		    }
 
-		    context.quads = context.quads.concat(result[1]);
+		    for(var i=0; i<linkedArray.length; i++) {
+			linked = linkedArray[i];
+			linked[linkedProp] = {'$id':invLinkedId};
+
+			result = MicrographQL.parseBGP(linked, context, false, graph, from, state);
+
+			inverseLinks = context.inverseMap[idInverseMap] || {};
+			context.inverseMap[idInverseMap] = inverseLinks;
+			
+			linked = inverseLinks[linkedProp] || [];
+			inverseLinks[linkedProp] = linked;
+			if(result[0].token === 'uri') {
+			    linked.push(result[0].value.split(MicrographQL.base_uri)[1]);
+			} else {
+			    linked.push(result[0].value);
+			}
+
+			context.quads = context.quads.concat(result[1]);
+		    }
 		} else {
 		    
 		    var predicateUri = p;
@@ -9020,10 +7307,21 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 		    if(p === '$state')
 			predicateUri = MicrographQL.base_uri+"state";
 
-		    predicate = MicrographQL.parseURI(predicateUri);
+		    if(p.indexOf(":") === -1 &&
+		       p.indexOf("/")!== -1 || 
+		       p.indexOf("*") === p.length-1 || 
+		       p.indexOf("?") === p.length-1 ||
+		       p.indexOf("+") === p.length-1) {
+			predicate = MicrographQL.parsePath(predicateUri);				
+		    } else if(p.indexOf("$path") != -1) {
+			predicate = MicrographQL.parsePath(predicateUri.split("$path")[0]);				
+		    } else {
+			predicate = MicrographQL.parseURI(predicateUri);	
+		    }
 
 		    // check if the object is a filter
 		    var isFilter = MicrographQL.isFilter(expression[p]);
+
 
 		    // process the object
 		    if(isFilter) {
@@ -9038,7 +7336,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 			if(graph != null)
 			    quad['graph'] = graph;
 			quads.push(quad);
-		    } else if(typeof(expression[p]) === 'object' && expression[p]['token'] === 'var') {
+		    } else if(expression[p] !== null && typeof(expression[p]) === 'object' && expression[p]['token'] === 'var') {
 			object = expression[p];
 			if(context.varsMap[expression] == null && context.nodes) {
 			    context.varsMap[expression] = true;
@@ -9054,6 +7352,7 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 			quads.push(quad);
 
 		    } else if(typeof(expression[p]) === 'string' || 
+			      expression[p] === null ||
 			      (typeof(expression[p]) === 'object' && expression[p].constructor === Date) || 
 			      typeof(expression[p]) === 'number' ||
 			      typeof(expression[p]) === 'boolean') {
@@ -9065,7 +7364,13 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 		    } else {
 			if(expression[p].constructor == Array) {
 			    for(var i=0; i<expression[p].length; i++) {
-				if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
+				if(expression[p][i] === null) {
+				    object = {'token': 'uri', 'value': MicrographQL.NIL};
+				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
+				    if(graph != null)
+					quad['graph'] = graph;
+				    quads.push(quad);
+				} else if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
 				    result = MicrographQL.parseBGP(expression[p][i], context, false, graph, from, state);
 				    object = result[0];
 				    context.quads = context.quads.concat(result[1]);
@@ -9163,7 +7468,9 @@ MicrographQL.literalToJS = function(object) {
 };
 
 MicrographQL.uriToJS = function(object) {
-    if(object.value.indexOf(MicrographQL.base_uri) != -1) {
+    if(object.value === MicrographQL.NIL) {
+	return null;
+    } if(object.value.indexOf(MicrographQL.base_uri) != -1) {
 	return {'$id': object.value.split(MicrographQL.base_uri)[1] }
     } else {
 	return {'$id': object.value }
@@ -9182,54 +7489,188 @@ try {
 */
 
 // Query object
+
+/**
+ * Creates a new MicrographQuery object modelling a data selection from the graph.
+ *
+ * @constructor
+ */
 var MicrographQuery = function(template) {
     this.template = template;
     this.lastResult = null;
-    this.filter = null;
+    this.filter = [];
+    this.groupPredicate = null;
+    this.startNodePath = null;
+    this.endNodePath = null;
 };
 
+/**
+ * Sets the kind of query. Possible values are 'all', 'first', 'allTuples', etc.
+ *
+ * @param {String} [kind] The textual value of the kind of query.
+ */
 MicrographQuery.prototype.setKind = function(kind) {
     this.kind = kind;
     return this;
 };
 
+/**
+ * Sets the Micrograph object backing this query.
+ *
+ * @param {Micrograph} [store] The data graph instance.
+ */
 MicrographQuery.prototype.setStore = function(store) {
     this.store = store;
     return this;
 };
 
+/**
+ * Sets the callback function that will be invoked with the results of the query
+ * when executed.
+ *
+ * @param {Function} [callback] The callback function.
+ */
 MicrographQuery.prototype.setCallback = function(callback) {
     this.callback = callback;
     return this;
 };
 
+/**
+ * Iterates through a data selection discarding applying the provided function and discarding the output.
+ *
+ * @param {Function} [callback] The function to apply.
+ */
 MicrographQuery.prototype.each = function(callback) {
-    this.filter = callback;
+    this.filter.push(['each',callback]);
     return this;
 };
 
+MicrographQuery.prototype.each_cc = function(callback) {
+    this.filter.push(['each',callback, true]);    
+    return this;
+};
+
+/**
+ * Transforms a data selection applying the provided function
+ *
+ * @param {Function} [callback] The function to apply.
+ */
+MicrographQuery.prototype.map = function(callback) {
+    this.filter.push(['map',callback]);
+    return this;
+};
+
+/**
+ * Reduces the data selection of the function using the provided initial value for the acumulator and reduce function.
+ *
+ * @param {Object} [acum] Initial acumulator value.
+ * @param {Function} [callback] The function to apply. 
+ */
+MicrographQuery.prototype.reduce = function(acum,callback) {
+    this.filter.push(['reduce',acum, callback]);
+    return this;
+};
+
+/**
+ * Filter results from the data section using the provided function as a predicate.
+ *
+ * @param {Function} [callback] The function to apply.
+ */ 
+MicrographQuery.prototype.select = function(callback) {
+    this.filter.push(['select',callback]);
+    return this;
+};
+
+/**
+ * Sets a callback function that will be invoked everytime an exception is raised.
+ *
+ * @param {Function} [callback] The error callback.
+ */
 MicrographQuery.prototype.onError = function(callback) {
     this.onErrorCallback =  callback;
     return this;
 };
 
+/**
+ * Limits the data in the current data selection.
+ *
+ * @param {number} [limit] The maximum size of the selection.
+ */
 MicrographQuery.prototype.limit = function(limit) {
     this.limitValue = limit;
     return this;
 };
 
+/**
+ * Sets an offset in the current data selection.
+ *
+ * @param {number} [offset] number of items in the current selection to skip.
+ */
 MicrographQuery.prototype.offset = function(offset) {
     this.offsetValue = offset;
     return this;
 };
 
+/**
+ * Groups the data selection using a property name or a predicate function.
+ *
+ * @param {Object} [groupPredicate] String with a property name or function with a grouping predicate.
+ */
+MicrographQuery.prototype.groupBy = function(groupPredicate) {
+    this.groupPredicate = (typeof(groupPredicate) === 'string' ? function(obj){ return obj[groupPredicate]; } : groupPredicate );
+    return this;
+};
+
+/**
+ * Orders the current data selection using the provided property name or array of properties. The ascending or descending order for the sorting predicate can be expressed setting the property in an object with value 1 or -1.
+ *
+ * @param {Object} [order] Property string, object with direction order or array of order specifications.
+ */
 MicrographQuery.prototype.order = function(order) {
     this.sortValue = order;
     return this;
-}
+};
 
+/**
+ * Sets the value of graph node with $id property as the starting point of a path expression.
+ *
+ * @param {Object} [node] Start node with $id property.
+ */
+MicrographQuery.prototype.startNode = function(node) {
+    this.template['$id'] = node['$id'];
+    this.startNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']));
+    return this;
+};
+
+/**
+ * Sets the value of graph node with $id property as the end point of a path expression.
+ *
+ * @param {Object} [node] End node with $id property.
+ */
+MicrographQuery.prototype.endNode = function(node) {
+    this.endNodePath = MicrographQL.parseURI((MicrographQL.isUri(node['$id']) ? node['$id'] : MicrographQL.base_uri+node['$id']));
+    for(var p in this.template) {
+	if(p != '$id') {
+	    this.template[p] = {'$id':node['$id']};
+	    break;
+	}
+    }
+    return this;
+};
+
+/**
+ * Triggers the evaluation of the current data selection returning all the retrieved results.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
 MicrographQuery.prototype.all = function(callback) {
-    this.kind = 'all';
+    if(callback == null)
+	callback = function(){};
+
+    if(this.kind === 'traverse')
+	this.kind = 'traverseAll';
+    else
+	this.kind = 'all';
     var that = this;
     this._executeQuery(function(result){
 	that.lastResult = result;
@@ -9239,6 +7680,52 @@ MicrographQuery.prototype.all = function(callback) {
     return this.store;
 };
 
+/**
+ * Triggers the evaluation of the current data selection returning all the retrieved results as instances.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
+MicrographQuery.prototype.instances = function(callback) {
+    if(callback == null)
+	callback = function(){};
+
+    var filter = this.filter;
+    this.filter = [];
+    var groupPredicate = this.groupPredicate;
+    this.groupPredicate = null;
+    var that = this;
+
+    this.all(function(results) {
+	if(results && results.constructor === Array) {
+	    for(var i=0; i<results.length; i++)
+		that.store.instantiate(results[i]);
+
+	    that.filter = filter;
+	    that.groupPredicate = groupPredicate;
+
+	    if(that.filter.length > 0) {
+		that._applyResultFilter(results, callback);
+	    } else {	
+		if(that.groupPredicate != null) 
+		    that._groupResults(results, callback);
+		else
+		    callback(results);
+	    }
+	} else if(results) {
+	    this.instantiate(results);
+	    callback(results);
+	} else {
+	    callback(null);
+	}
+    });
+    return this.store;
+};
+
+/**
+ * Triggers the evaluation of the current data selection returning the first result in the selection.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
 MicrographQuery.prototype.first = function(callback) {
     var that = this;
     this.all(function(res){
@@ -9256,7 +7743,15 @@ MicrographQuery.prototype.first = function(callback) {
     return this.store;
 };
 
+/**
+ * Triggers the evaluation of the current data selection returning all the retrieved tuples.
+ *
+ * @param {Function} [callback] Callback function that will receive the selection data results
+ */
 MicrographQuery.prototype.tuples = function(callback) {
+    if(callback == null)
+	callback = function(){};
+
     this.kind = 'tuples';
     var that = this;
     this._executeQuery(function(results){
@@ -9271,7 +7766,15 @@ MicrographQuery.prototype.tuples = function(callback) {
 		    }
 		}
 	    }
-	    callback(results);
+	    
+	    if(that.filter.length > 0) {
+		that._applyResultFilter(results, callback);
+	    } else {	
+		if(that.groupPredicate != null) 
+		    that._groupResults(results, callback);
+		else
+		    callback(results);
+	    }
 	} else {
 	    callback(results);
 	}
@@ -9279,6 +7782,11 @@ MicrographQuery.prototype.tuples = function(callback) {
     return this.store;
 };
 
+/**
+ * Removes the data assertions in the current data selection from the graph.
+ *
+ * @param {Function} [callback] Callback receiving the results.
+ */
 MicrographQuery.prototype.remove = function(callback) {
     this.kind = 'remove';
     this.store.startGraphModification();
@@ -9287,7 +7795,11 @@ MicrographQuery.prototype.remove = function(callback) {
     return this.store;
 };
 
-
+/**
+ * Removes the nodes in the current data selection from the graph.
+ *
+ * @param {Function} [callback] Callback receiving the results.
+ */
 MicrographQuery.prototype.removeNodes = function(callback) {
     this.kind = 'removeNodes';
     this.store.startGraphModification();
@@ -9297,12 +7809,17 @@ MicrographQuery.prototype.removeNodes = function(callback) {
 };
 
 
+/**
+ * Binds a function to the current selection.
+ *
+ * @param {Function} [callback] Callback receiving the results.
+ */
 MicrographQuery.prototype.bind = function(callback) {
     var pattern = this._parseQuery(this.template);
-    this.store.bind(pattern,callback);
+    this.store.bind(pattern,this,callback);
 
     return this.store;
-}
+};
 
 // protected inner methods
 
@@ -9322,6 +7839,7 @@ MicrographQuery.prototype._executeUpdate = function(callback) {
 
 MicrographQuery.prototype._executeQuery = function(callback) {
     var pattern = this._parseQuery(this.template);
+    var that = this;
 
     this.query = pattern.query;
     this.varsMap = pattern.varsMap;
@@ -9332,6 +7850,7 @@ MicrographQuery.prototype._executeQuery = function(callback) {
     // Final processing of query
     var quads = this.query.units[0].pattern.patterns[0].triplesContext;
     var unit = this.query.units[0];
+
     // sort by
     var  sortAcum = [];
     if(this.sortValue) {
@@ -9376,20 +7895,12 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 	}
     }
 
-    if(this.limitValue != null)
-	unit.limit = this.limitValue;
-
-    if(this.offsetValue != null) 
-	unit.offset = this.offsetValue;
-
     if(sortAcum.length > 0)
 	unit.order = sortAcum;
-
 
     if(callback != null )
 	this.callback = callback;
 
-    var that = this;
     var toReturn = [];
 
     if(this.kind === "all") {
@@ -9397,6 +7908,8 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 
 	this.store.execute(this.query, function(success, results) {
 	    //console.log("results : "+results.length);
+	    //console.log(results);
+	    //console.log("=======================");
 	    if(MicrographQL.isUri(that.varsMap[that.topLevel]) && results.length>0) {
 		// if the top level is a URI, not retrieved in the results,
 		// and there are results, we add the node to one result
@@ -9406,23 +7919,17 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 
 	    if(success) {
 
-		toReturn = MicrographQuery._processQueryResults(results, that.topLevel, that.varsMap, that.inverseMap, that.store);
+		toReturn = MicrographQuery._processQueryResults(results, that.topLevel, that.varsMap, that.inverseMap, that.store, that.offsetValue, that.limitValue);
+		that.offsetValue = null;
+		that.limitValue = null;
 
-		if(that.filter != null) {
-		    var filtered = [];
-		    var filteredResult;
-		    Utils.repeat(0,toReturn.length, function(k,env) {
-			var floop = arguments.callee;
-			var result = toReturn[env._i];
-			filteredResult = that.filter(result) || result;
-			if(filtered !== false)
-			    filtered.push(filteredResult);
-			k(floop,env);
-		    }, function(env) {
-			callback(filtered); 
-		    });
+		if(that.filter.length>0) {
+		    that._applyResultFilter(toReturn, callback);
 		} else {	
-		    callback(toReturn);
+		    if(that.groupPredicate != null) 
+			that._groupResults(toReturn, callback);
+		    else
+			callback(toReturn);
 		}
 	    } else {
 		if(that.onErrorCallback) {
@@ -9443,12 +7950,75 @@ MicrographQuery.prototype._executeQuery = function(callback) {
 		that.callback(null);
 	    }
 	});
+    } else if(this.kind === 'traverseAll') {
+	//console.log(sys.inspect(this.query, true, 20));
+	this.store.execute(this.query, function(success, results) {
+	    if(success) {
+		var toReturn = [];
+		var nodes = {};
+		var disambiguations = {};
+		var toIgnore = {};
+		for(var i=0; i<results.length; i++) {
+		    var result = results[i];
+		    if(that.startNodePath != null)
+			result['start'] = that.startNodePath;
+		    if(that.endNodePath != null)
+			result['end'] = that.endNodePath;
+		    if(result['start'].token === 'uri') {
+			var id = result['start'].value;
+			if(nodes[id] == null) {
+			    that.store.execute(MicrographQL.singleNodeQuery(id, 'p', 'o'), function(success, resultsNode){
+				var node = nodes[id] || {'$id':(id.indexOf(MicrographQL.base_uri) != -1 ? id.split(MicrographQL.base_uri)[1] : id)};
+				nodes[id] = node;
+
+				MicrographQuery._processSingleNodeResults(id, resultsNode, node, disambiguations, nodes, {});
+				result['start'] = node;
+			    });
+			} else {
+			    result['start'] = nodes[id];
+			}
+		    } else {
+			result['start'] = MicrographQL.literalToJS(result['start']);
+		    }
+		    if(result['end'].token === 'uri') {
+			id = result['end'].value;
+			if(nodes[id] == null) {
+			    that.store.execute(MicrographQL.singleNodeQuery(id, 'p', 'o'), function(success, resultsNode){
+				var node = nodes[id] || {};
+				nodes[id] = node;
+
+				MicrographQuery._processSingleNodeResults(id, resultsNode, node, disambiguations, nodes, {});
+				result['end'] = node;
+			    });
+			} else {
+				result['end'] = nodes[id];
+			}
+		    } else {
+			result['end'] = MicrographQL.literalToJS(result['end']);
+		    }
+		}
+
+		if(that.filter.length>0) {
+		    that._applyResultFilter(results, callback);
+		} else {
+		    if(that.groupPredicate != null) 
+			that._groupResults(results, callback);
+		    else
+			that.callback(results);
+		}
+	    } else {
+		if(that.onErrorCallback) {
+		    that.onError(results);
+		}
+		that.callback(null);
+	    }
+	});
     }
 }
 
 MicrographQuery.prototype._parseQuery = function(object) {
     var context = MicrographQL.newContext(true);
-    if(this.kind === 'tuples')
+    if(this.kind === 'tuples' || this.kind === 'traverseAll')
 	context.nodes = false;
     var result = MicrographQL.parseBGP(object, context, true);
     var subject = result[0];
@@ -9561,10 +8131,12 @@ MicrographQuery.prototype._parseModifyNodes = function(object, callback) {
 
 	    that.template = {'$id': result[i].$id};
 	    that.kind = 'removeNode';
-	    that._executeUpdate(function(result){
-		if(result===true)
+	    that._executeUpdate(function(updateResult){
+		if(updateResult===true)
 		    counter++;
-		that._unlinkNode(that.template['$id'])
+		that._unlinkNode(that.template['$id']);
+		if(that.store.nodeDeletedCallback)
+		    that.store.nodeDeletedCallback(result[i]);
 	    });
 	};
     });
@@ -9597,7 +8169,7 @@ MicrographQuery.prototype._unlinkNode = function(id,cb,excludeIncoming){
 	    cb(true);
 	}
     });
-}
+};
 
 MicrographQuery.prototype._modifyQuery = function(quads) {
 
@@ -9624,7 +8196,7 @@ MicrographQuery.prototype._modifyQuery = function(quads) {
 		      'units':[unit]}};		 
 };
 
-MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inverseMap, store) {
+MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inverseMap, store, offsetValue, limitValue) {
     var pushed = {};
     var processed = {};
     var ignore = {};
@@ -9633,6 +8205,34 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
     var result, isTopLevel, nodeDisambiguations;
     var counter = 0;
     var toReturn = [];
+    var that = this;
+
+    if(offsetValue != null || limitValue != null) {
+	offsetValue = offsetValue || 0;
+	limitValue = limitValue || (results.length - offsetValue);
+	limitValue = offsetValue+limitValue;
+	var resultsAcum = [], resultsAcumMap = {}, idVal, goodResults = {};
+	var nodesFound = 0;
+
+	for(var i=0; i<results.length; i++) {
+	    idVal = results[i][topLevel].value;
+
+	    if(resultsAcumMap[idVal] == null) {
+		resultsAcumMap[idVal] = true;
+		if(nodesFound>=offsetValue && nodesFound<limitValue) {
+		    goodResults[idVal] = true;
+		    resultsAcum.push(results[i]);
+		}
+		nodesFound++;
+	    } else {
+		if(goodResults[idVal]) {
+		    resultsAcum.push(results[i]);
+		}
+	    }
+	}
+
+	results = resultsAcum;
+    }
 
     for(var i=0; i<results.length; i++) {
 	result = results[i];
@@ -9647,7 +8247,7 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 	    if(p === topLevel)
 		isTopLevel = true;
 
-	    var id = idp.split(MicrographQL.base_uri)[1];
+	    var id = (idp.indexOf(MicrographQL.base_uri) != -1 ? idp.split(MicrographQL.base_uri)[1] : idp);
 
 	    var node = nodes[id];
 	    node = node || {'$id': id};
@@ -9656,13 +8256,21 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 	    var invLinks = inverseMap[id] || inverseMap[p];
 	    if(invLinks) {
 		for(var linkedProp in invLinks) {
-		    if(invLinks[linkedProp].length === 1) {
-			var linkedObjId = results[i][varsMap[invLinks[linkedProp][0]]];
+		    nodeDisambiguations  = disambiguations[node['$id']] || {};
+		    disambiguations[node.id] = nodeDisambiguations;
+		    var invDisambiguations = nodeDisambiguations[linkedProp+"$in"] ||{};
+		    nodeDisambiguations[linkedProp+"$in"] = invDisambiguations;
+
+		    for(var j=0; j<invLinks[linkedProp].length; j++) {
+
+			var linkedObjId = results[i][varsMap[invLinks[linkedProp][j]]];
 			if(linkedObjId != null) {
 			    // this is a variable resolved to a URI in the bindings results
-			    linkedObjId = linkedObjId.value.split(MicrographQL.base_uri)[1];
+			    linkedObjId = linkedObjId.value;
+			    if(linkedObjId.indexOf(MicrographQL.base_uri) != -1)
+			       linkedObjId = linkedObjId.split(MicrographQL.base_uri)[1];
 			} else {
-			    linkedObjId = invLinks[linkedProp][0];
+			    linkedObjId = invLinks[linkedProp][j];
 			}
 
 			var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
@@ -9672,35 +8280,28 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 			delete linkedNode[linkedProp];
 
 			nodes[linkedObjId] = linkedNode;
+
 			if(node[linkedProp+"$in"] == null) {
 			    node[linkedProp+"$in"] = linkedNode;
+			    invDisambiguations[linkedNode['$id']] = true;
+			    
 			} else if(node[linkedProp+"$in"].constructor === Array) {
-			    node[linkedProp+"$in"].push(linkedNode);
+			    if(invDisambiguations[linkedNode['$id']] !== true) {
+				node[linkedProp+"$in"].push(linkedNode);
+				invDisambiguations[linkedNode['$id']] = true
+			    }
 			} else {
-			    node[linkedProp+"$in"] = [node[linkedProp+"$in"], linkedNode];
-			}
-		    } else {
-			node[linkedProp+"$in"] = [];
-			for(var i=0; i< invLinks[linkedProp].length; i++) {
-
-			    var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
-			    var toIgnore = ignore[linkedObjId] || {};					  
-			    ignore[linkedObjId] = toIgnore;
-			    toIgnore[linkedProp] = true;
-			    delete linkedNode[linkedProp];
-
-			    var linkedObjId = varsMap[invLinks[linkedProp][0]] || invLinks[linkedProp][0];
-			    var linkedNode = nodes[linkedObjId] || {'$id': linkedObjId};
-			    nodes[linkedObjId].push(linkedNode);
+			    if(invDisambiguations[linkedNode['$id']] !== true) {			    
+				node[linkedProp+"$in"] = [node[linkedProp+"$in"], linkedNode];
+				invDisambiguations[linkedNode['$id']] = true
+			    }
 			}
 		    }
 		}
 	    }
 
-
-
 	    if(processed[id] == null) {		
-		toIgnore = ignore[id] || {};
+		var toIgnore = ignore[id] || {};
 		ignore[id] = toIgnore;
 
 
@@ -9708,106 +8309,7 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 		    store.execute(MicrographQL.singleNodeQuery(idp, 'p', 'o'), function(success, resultsNode){
 			processed[id] = true;
 			counter++;
-
-			nodeDisambiguations = disambiguations[id] || {};
-			disambiguations[id] = nodeDisambiguations;
-
-			var obj = null;
-			for(var i=0; i<resultsNode.length; i++) {
-			    var obj = resultsNode[i]['o'];
-			    if(obj.token === 'uri') {
-				var oid = obj.value.split(MicrographQL.base_uri)[1];
-				var linked  = nodes[oid] || {};
-				linked['$id'] = oid;
-				nodes[oid] = linked;
-				obj = linked;
-			    } else {
-				obj = MicrographQL.literalToJS(obj);
-			    }
-
-			    var pred = resultsNode[i]['p'].value;
-			    if(pred === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
-				pred = '$type';
-			    if(pred === MicrographQL.base_uri+"from")
-				pred = '$from';
-			    if(pred === MicrographQL.base_uri+'state')
-				pred = '$state';
-
-			    if(toIgnore[pred])
-				continue;
-
-			    if(node[pred] && node[pred].constructor === Array) {
-				if(typeof(obj) === 'object' && obj['$id'] && nodeDisambiguations[pred][obj['$id']] == null) {
-				    nodeDisambiguations[pred][obj['$id']] = true;
-				    node[pred].push(obj);
-				} else if(typeof(obj) !== 'object' && obj.constructor === Date && nodeDisambiguations[pred]['date:'+obj.getTime()] == null) {
-				    nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
-				    node[pred].push(obj);
-				} else if(nodeDisambiguations[pred][obj] == null) {
-				    nodeDisambiguations[pred][obj] = true;
-				    node[pred].push(obj);
-				}
-			    } else if(node[pred]) {
-				if(typeof(node[pred]) === 'object' && node[pred]['$id'] != null) {
-				    if(typeof(obj) === 'object' && obj['$id'] != null) {
-					if(node[pred]['$id'] != obj['$id']) {
-					    node[pred] = [node[pred],obj];
-					    nodeDisambiguations[pred] = {};
-					    nodeDisambiguations[pred][node[pred][0]['$id']] = true;
-					    nodeDisambiguations[pred][node[pred][1]['$id']] = true;
-					}
-				    } else {
-					nodeDisambiguations[pred] = {};
-					nodeDisambiguations[pred][node[pred]['$id']] = true;
-					if(typeof(obj) === 'object') {
-					    nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
-					} else {
-					    nodeDisambiguations[pred][obj] = true;
-					}
-					node[pred] = [node[pred],obj];
-				    }
-				} else if(typeof(node[pred]) === 'object') {
-				    if(typeof(obj) === 'object' && obj['$id'] == null) {
-					if(node[pred].getTime() !== obj.getTime()) {
-					    node[pred] = [node[pred],obj];
-					    nodeDisambiguations[pred] = {};
-					    nodeDisambiguations[pred]['date:'+node[pred][0].getTime()] = true;
-					    nodeDisambiguations[pred]['date:'+node[pred][1].getTime()] = true;
-					}
-				    } else {
-					nodeDisambiguations[pred] = {};
-					nodeDisambiguations[pred]['date:'+node[pred].getTime()] = true;
-					if(typeof(obj) === 'object') {
-					    nodeDisambiguations[pred][obj['$id']] = true;
-					} else {
-					    nodeDisambiguations[pred][obj] = true;
-					}
-					node[pred] = [node[pred],obj];
-				    }
-				} else {
-				    if(typeof(obj) !== 'object') {
-					if(obj != node[pred]) {
-					    nodeDisambiguations[pred] = {};
-					    nodeDisambiguations[pred][obj] = true;
-					    nodeDisambiguations[pred][node[pred]] = true;
-					    node[pred] = [node[pred],obj];
-					}
-				    } else {
-					nodeDisambiguations[pred] = {};
-					nodeDisambiguations[pred][node[pred]] = true;
-
-					if(obj['$id'] == null) {
-					    nodeDisambiguations[pred][obj['$id']] = true;						    
-					} else {
-					    nodeDisambiguations[pred]['date:'+obj.getTime()] = true;						    
-					}
-					node[pred] = [node[pred],obj];
-				    }
-				}
-			    } else {
-				node[pred] = obj;
-			    }
-			}
+			that._processSingleNodeResults(id, resultsNode, node, disambiguations, nodes, toIgnore);
 
 			if(isTopLevel && pushed[node['$id']] == null) {
 			    toReturn.push(node);
@@ -9829,6 +8331,200 @@ MicrographQuery._processQueryResults = function(results, topLevel, varsMap, inve
 
     return toReturn;
 }
+
+
+MicrographQuery._processSingleNodeResults = function(id, resultsNode, node, disambiguations, nodes, toIgnore) {
+    nodeDisambiguations = disambiguations[id] || {};
+    disambiguations[id] = nodeDisambiguations;
+
+    var obj = null;
+    for(var i=0; i<resultsNode.length; i++) {
+	var obj = resultsNode[i]['o'];
+	if(obj.token === 'uri') {
+	    if(obj.value === MicrographQL.NIL) {
+		obj = null;
+	    } else {
+		var oid = (obj.value.indexOf(MicrographQL.base_uri) != -1 ? obj.value.split(MicrographQL.base_uri)[1] : obj.value);
+		var linked  = nodes[oid] || {};
+		linked['$id'] = oid;
+		nodes[oid] = linked;
+		obj = linked;
+	    }
+	} else {
+	    obj = MicrographQL.literalToJS(obj);
+	}
+
+	var pred = resultsNode[i]['p'].value;
+
+	if(pred === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+	    pred = '$type';
+	if(pred === MicrographQL.base_uri+"from")
+	    pred = '$from';
+	if(pred === MicrographQL.base_uri+'state')
+	    pred = '$state';
+
+	if(toIgnore[pred])
+	    continue;
+
+	if(node[pred] && node[pred].constructor === Array && obj !== null) {
+	    if(typeof(obj) === 'object' && obj['$id'] && nodeDisambiguations[pred][obj['$id']] == null) {
+		nodeDisambiguations[pred][obj['$id']] = true;
+		node[pred].push(obj);
+	    } else if(typeof(obj) !== 'object' && obj.constructor === Date && nodeDisambiguations[pred]['date:'+obj.getTime()] == null) {
+		nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
+		node[pred].push(obj);
+	    } else if(nodeDisambiguations[pred][obj] == null) {
+		nodeDisambiguations[pred][obj] = true;
+		node[pred].push(obj);
+	    }
+	} else if(node[pred] && obj !== null) {
+	    if(typeof(node[pred]) === 'object' && node[pred]['$id'] != null) {
+		if(typeof(obj) === 'object' && obj['$id'] != null) {
+		    if(node[pred]['$id'] != obj['$id']) {
+			node[pred] = [node[pred],obj];
+			nodeDisambiguations[pred] = {};
+			nodeDisambiguations[pred][node[pred][0]['$id']] = true;
+			nodeDisambiguations[pred][node[pred][1]['$id']] = true;
+		    }
+		} else {
+		    nodeDisambiguations[pred] = {};
+		    nodeDisambiguations[pred][node[pred]['$id']] = true;
+		    if(typeof(obj) === 'object') {
+			nodeDisambiguations[pred]['date:'+obj.getTime()] = true;
+		    } else {
+			nodeDisambiguations[pred][obj] = true;
+		    }
+		    node[pred] = [node[pred],obj];
+		}
+	    } else if(typeof(node[pred]) === 'object') {
+		if(typeof(obj) === 'object' && obj['$id'] == null) {
+		    if(node[pred].getTime() !== obj.getTime()) {
+			node[pred] = [node[pred],obj];
+			nodeDisambiguations[pred] = {};
+			nodeDisambiguations[pred]['date:'+node[pred][0].getTime()] = true;
+			nodeDisambiguations[pred]['date:'+node[pred][1].getTime()] = true;
+		    }
+		} else {
+		    nodeDisambiguations[pred] = {};
+		    nodeDisambiguations[pred]['date:'+node[pred].getTime()] = true;
+		    if(typeof(obj) === 'object') {
+			nodeDisambiguations[pred][obj['$id']] = true;
+		    } else {
+			nodeDisambiguations[pred][obj] = true;
+		    }
+		    node[pred] = [node[pred],obj];
+		}
+	    } else {
+		if(typeof(obj) !== 'object') {
+		    if(obj != node[pred]) {
+			nodeDisambiguations[pred] = {};
+			nodeDisambiguations[pred][obj] = true;
+			nodeDisambiguations[pred][node[pred]] = true;
+			node[pred] = [node[pred],obj];
+		    }
+		} else {
+		    nodeDisambiguations[pred] = {};
+		    nodeDisambiguations[pred][node[pred]] = true;
+
+		    if(obj['$id'] != null) {
+			nodeDisambiguations[pred][obj['$id']] = true;						    
+		    } else {
+			nodeDisambiguations[pred]['date:'+obj.getTime()] = true;						    
+		    }
+		    node[pred] = [node[pred],obj];
+		}
+	    }
+	} else {
+	    node[pred] = obj;
+	}
+    }
+
+};
+
+MicrographQuery.prototype._applyResultFilter = function(toReturn, callback) {
+    var nextFilter = this.filter.shift();
+    var filterType = nextFilter[0];
+    var continuation = (nextFilter.length === 3);
+    var continuationFunction = nextFilter[1];
+    if(continuation !== true) {	
+	if(filterType === 'reduce') {
+	    continuationFunction = function(acum, item, k) {
+		k(nextFilter[1](acum,item));
+	    };
+	} else {
+	    continuationFunction = function(item, k) {
+		k(nextFilter[1](item));
+	    };
+	}
+    }
+
+    var reduceAcum = null;
+    var filtered = [];
+    var filteredResult;
+    var that = this;
+    Utils.repeatAsync(0,toReturn.length, function(k,env) {
+	var floop = arguments.callee;
+	var result = toReturn[env._i];
+        var args = [];
+
+		  
+	if(filterType === 'reduce') {
+	    reduceAcum = nextFilter[1];
+	    args.push(reduceAcum);
+	    args.push(result);
+	    //filteredResult = nextFilter[2](reduceAcum, result);
+	} else
+	    args.push(result);
+	    //filteredResult = nextFilter[1](result);
+
+        args.push(function(filteredResult){
+	    if(filterType === 'select') {
+		if(filteredResult !== false)
+		    filtered.push(result);
+	    } else {
+		if(filterType === 'map')
+		    filtered.push(filteredResult);
+		else if(filterType === 'each') {
+		    filtered.push(result);
+		} else if(filterType === 'reduce')
+		    reduceAcum = filteredResult;
+	    }
+	    k(floop,env);
+	});
+
+
+	continuationFunction.apply(that,args);
+
+    }, function(env) {
+	if(filterType === 'reduce')
+	    filtered = reduceAcum;
+
+	if(that.filter.length === 0) {
+	    if(that.groupPredicate != null) 
+		that._groupResults(filtered, callback);
+	    else
+		callback(filtered); 
+	} else
+	    that._applyResultFilter(filtered, callback);
+    });
+
+};
+
+
+MicrographQuery.prototype._groupResults = function(results, callback) {
+    if(results) {
+	var acum = {};
+	for(var i=0; i<results.length; i++) {
+	    var value = this.groupPredicate(results[i]);
+	    var group = acum[value] || [];
+	    group.push(results[i]);
+	    acum[value] = group;
+	}
+	callback(acum);
+    } else {
+	callback(null);
+    }
+};
 // end of ./src/micrograph/src/micrograph_query.js 
 // exports
 var MicrographClass = {};
@@ -9901,9 +8597,10 @@ MicrographClass.check = function(resource) {
 MicrographClass.isInstance = function(resource, klass) {
     if(klass.indexOf("and(") === 0) {
         var parts = klass.slice(0,klass.length-1).split("and(")[1].split(",");
-            if(!MicrographClass.isInstance(resource, parts[i])) {
+	for(var i=0; i<parts.length; i++) {
+            if(!MicrographClass.isInstance(resource, parts[i]))
                 return false;
-            }
+	}
         return true;
     } else if(klass.indexOf("or(") === 0) {
         var parts = klass.slice(0,klass.length-1).split("or(")[1].split(",");
@@ -9915,7 +8612,7 @@ MicrographClass.isInstance = function(resource, klass) {
         return false;
     } else if(klass.indexOf("prop(") === 0) {
         var propertyUri = klass.slice(0,klass.length-1).split("prop(")[1];
-        return resource[propertyUri] != null
+        return resource[propertyUri] != null;
     } else if(klass.indexOf("not(") === 0) {
         var expression = klass.slice(0,klass.length-1).split("not(")[1];
 	return !MicrographClass.isInstance(resource,expression);
@@ -9928,7 +8625,7 @@ MicrographClass.isInstance = function(resource, klass) {
 		}
 		return false;
 	    } else {
-		return resource['$type'] === klass
+		return resource['$type'] === klass;
 	    }
 	} else {
 	    return false;
@@ -9950,11 +8647,218 @@ try {
 }
 */
 
-// Store
-var Micrograph = function(options, callback) {
-    if(options['treeOrder'] == null) {
-        options['treeOrder'] = 15;
+// Microdata object
+
+/**
+ * Creates a new Microdata parser for the provided base URI and data source.
+ *
+ * @constructor
+ * @param {String} [baseURI] base URI of the document. It will be used to transform relative URIs into absolute URIs
+ * @param {DOMElement} [source] the DOM tree to be parsed.
+ */
+Microdata = function(baseURI,source) {
+    this.baseURI = baseURI;
+
+    if(source == null)
+	this.doc = document;
+    else
+	this.doc = source;
+};
+
+Microdata.prototype._toArray = function(nodeList) {
+    var acum = [];
+    if(nodeList == null)
+	return acum;
+    for (var i = 0; i < nodeList.length; i++)
+	acum[i] = nodeList[i];
+    return acum;
+};
+
+/**
+ * Get all elements with the requested attribute in the provided DOM element subtree
+ * 
+ * @param {DOMElement} [element] the DOM element at the top of the search tree.
+ * @param {String} [strAttributeName] name of the attribute to look for.
+ * @param {bool} [includeFirst] if set to true, the top element will also be returned if it defines the element. True by default.
+ */
+Microdata.prototype._getElementsByAttribute = function(element, strAttributeName, includeFirst)  {
+    arrElements = [element];
+    includeFirst = includeFirst || true;
+    var arrReturnElements = new Array();
+    var oCurrent;
+    var oAttribute;
+
+    while(arrElements.length>0) {
+        oCurrent = arrElements.shift();
+
+	if(oCurrent.nodeType === Node.ELEMENT_NODE &&
+	   oCurrent.tagName.toLowerCase() !== 'link' &&
+	   oCurrent.tagName.toLowerCase() !== 'iframe' &&
+	   oCurrent.tagName.toLowerCase() !== 'meta') {
+
+	    var childNodes = oCurrent.childNodes;
+	    var isItemScope = (oCurrent.getAttribute && oCurrent.getAttribute("itemscope") != null)
+	    var isItemProperty = (oCurrent.getAttribute && oCurrent.getAttribute("itemproperty") != null)
+
+            oAttribute = oCurrent.getAttribute && oCurrent.getAttribute(strAttributeName);
+	    if(strAttributeName === "itemscope") {
+		if(oAttribute != null) {
+		    if(oCurrent != element || includeFirst)
+			arrReturnElements.push(oCurrent);					    
+		} else if(childNodes) {
+		    arrElements = arrElements.concat(this._toArray(childNodes));
+		}
+	    } else if(strAttributeName === "itemprop") {
+		if(oAttribute != null && oCurrent != element) {
+		    arrReturnElements.push(oCurrent);
+		} else if(childNodes && !isItemScope || oCurrent == element){
+		    arrElements = arrElements.concat(this._toArray(childNodes));
+		}
+	    }  else {
+		if(oAttribute != null) {
+		    arrReturnElements.push(oCurrent);
+		} else if(childNodes && !isItemScope || oCurrent == element){
+		    arrElements = arrElements.concat(this._toArray(childNodes));
+		}
+	    }
+	}
     }
+    return arrReturnElements;
+};
+
+
+/**
+ * Performs the parsing of microdata in the document
+ * passed in the constructor function.
+ */
+Microdata.prototype.parse = function() {
+    var scopes;
+    var from = this.doc;
+
+    if(arguments.length == 1 || this.tag)
+	from = this.doc.getElementById(this.tag || arguments[0]);
+
+    scopes = this._getElementsByAttribute(from, "itemscope", true);
+
+    var nodes = [];
+    for(var i=0; i<scopes.length; i++)
+	nodes.push(this._processNode(scopes[i]));
+
+    return nodes;
+};
+
+Microdata.prototype._parseType = function(elem, acum) {
+    var types = [];
+    var typesFound = this._getElementsByAttribute(elem, "itemtype", true);
+    for(var i=0; i<typesFound.length; i++) {
+	types.push(typesFound[i].getAttribute("itemtype"));
+    }
+    if(types.length == 1) {
+	acum['$type'] = types[0];
+    } else if(typesFound.length>1) {
+	acum['$type'] = types;
+    }
+};
+
+Microdata.prototype._parseProperties = function(elem, acum) {
+
+    var propsFound = this._getElementsByAttribute(elem, "itemprop", false);
+    for(var i=0; i<propsFound.length; i++) {
+	this._processProperty(acum, propsFound[i]);
+    }
+};
+
+Microdata.prototype._parseId = function(elem, acum) {
+    var propsFound = this._getElementsByAttribute(elem, "itemid", true);
+    if(propsFound.length === 1)
+	acum['$id'] = propsFound[0].getAttribute("itemid");
+};
+
+Microdata.prototype._processProperty = function(acum, property) {
+    // section 2.4 microdata HTML5 spec
+    var name = property.getAttribute("itemprop");
+    var oldValue = acum[name];
+    var newValue = null;
+    var tag = property.tagName.toLowerCase();
+    var value;
+
+    if(property.getAttribute("itemscope") != null) {
+	// nested node
+	newValue = this._processNode(property);
+    } else if(tag === 'meta') {
+	newValue = property.content;
+    } else if(tag === 'audio' || tag === 'embed' || tag === 'iframe' || 
+	      tag === 'source' || tag === 'track' || tag === 'video' || tag === 'img') {
+	value = property.getAttribute("src");
+	if(value.indexOf(":") != -1)
+	    newValue = value;
+	else
+	    newValue = this.baseURI + value;
+    } else if(tag === 'a' || tag === 'area' || tag === 'link') {
+	value = property.getAttribute("href");
+	if(value.indexOf(":") != -1)
+	    newValue = value;
+	else
+	    newValue = this.baseURI + value;
+    } else if(tag === 'object') {
+	value = property.getAttribute("data");
+	if(value.indexOf(":") != -1)
+	    newValue = value;
+	else
+	    newValue = this.baseURI + value;
+    } else if(property.getAttribute("datetime") != null) {
+	// parse attr datetime
+	newValue = new Date(property.getAttribute("datetime"));
+    } else {
+	newValue = property.textContent;
+    }
+
+    if(oldValue == null) 
+	acum[name] = newValue;
+    else if(typeof(oldValue) === 'object' && oldValue.constructor === Array)
+	acum[name].push(newValue);
+    else
+	acum[name] = [oldValue, newValue];
+};
+
+Microdata.prototype._processNode = function(elem) {
+    var acum = {};
+    this._parseId(elem, acum);
+    if(elem.getAttribute && elem.getAttribute("itemref") != null) {
+	var ids = elem.getAttribute("itemref").split(/\s+/);
+	for(var i=0; i<ids.length; i++) {
+	    var id = ids[i];
+	    elem = this.doc.getElementById(id);
+	    this._parseType(elem, acum);
+	    this._parseProperties(elem, acum);
+	}
+    } else {
+	this._parseType(elem, acum);
+	this._parseProperties(elem, acum);
+    }
+    return acum;
+}
+
+// Store
+
+/**
+ * Builds a new Micrograph object.<br/>
+ * <br/>
+ *
+ * @constructor
+ * @param {Object} [options]
+ * <ul>
+ *  <li> persistent:  should the store use persistence? </li>
+ *  <li> treeOrder: in versions of the store backed by the native indexing system, the order of the BTree indices</li>
+ *  <li> name: when using persistence, the name for this store. In the MongoDB backed version, name of the DB used by the store. By default <code>'rdfstore_js'</code> is used</li>
+ *  <li> overwrite: clears the persistent storage </li>
+ *  <li> maxCacheSize: if using persistence, maximum size of the index cache </li>
+ * </ul>
+ * @param {Function} [callback]  Callback function that will be invoked with the initialised instance of the store.
+ */
+var Micrograph = function(options, callback) {
+    if(!options['treeOrder'])
+        options['treeOrder'] = 15;
 
     var that = this;
     this.callbackToInner = {};
@@ -9969,6 +8873,9 @@ var Micrograph = function(options, callback) {
     this.transformFunction = null;
     this.defaultFrom = null;
     this.defaultState = 'created';
+    this.nodeDeletedCallback = null;
+    this.nodeUpdatedCallback = null;
+    this.blank = 0;
 
     for(var i=0; i<Micrograph.vars.length; i++) {
 	this['_'+Micrograph.vars[i]] = this._(Micrograph.vars[i]);
@@ -9979,7 +8886,7 @@ var Micrograph = function(options, callback) {
     var isPersistent = options['persistent'];
     var LexiconModule = Lexicon;
     if(isPersistent) 
-	LexiconModule = WebLocalStorageLexicon;
+	LexiconModule = Micrograph.WebLocalStorageLexicon;
 
     new LexiconModule.Lexicon(function(lexicon){
         if(options['overwrite'] === true) {
@@ -9989,7 +8896,7 @@ var Micrograph = function(options, callback) {
 
 	var baseTree = InMemoryBTree;
 	if(isPersistent)
-	    baseTree = WebLocalStorageBTree;
+	    baseTree = Micrograph.WebLocalStorageBTree;
 	    
         new QuadBackend.QuadBackend(options, baseTree, function(backend){
             if(options['overwrite'] === true) {
@@ -10025,19 +8932,66 @@ var Micrograph = function(options, callback) {
     },options['name']);
 };
 
-Micrograph.VERSION = "0.4.0";
+/**
+ * Placeholder for the persistent lexicon implementation
+ */
+Micrograph.WebLocalStorageLexicon;
 
+/**
+ * Placeholder for the persistent BTree implementation
+ */
+Micrograph.WebLocalStorageBTree;
+
+/**
+ * Version of the library.
+ */
+Micrograph.VERSION = "0.4.3";
+
+/**
+ * Name for variables that will be automatically declared.
+ */
 Micrograph.vars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
 
+/**
+ * Sets a callback error that will be invoked upon error.
+ *
+ * @param {Function} [cb] Error callback function.
+ */
 Micrograph.prototype.onError = function(cb) {
     this.errorCallback = cb;
     return this;
 };
 
+/**
+ * Sets a callback function that will be invoked every time the state of a node in the graph is modified
+ *
+ * @param {Function} [cb] Update callback function that will receive the new node state.
+ */
+Micrograph.prototype.onUpdate = function(cb) {
+    this.nodeUpdatedCallback = cb;
+    return this;
+};
+
+/**
+ * Sets a callback function that will be invoked every time the state of a node in the graph is deleted
+ *
+ * @param {Function} [cb] Update callback function that will receive the node deleted.
+ */
+Micrograph.prototype.onDelete = function(cb) {
+    this.nodeDeletedCallback = cb;
+    return this;
+};
+
+/**
+ * Creates a new non persistent Micrograph instance.
+ *
+ * @param {Object} [options] a hash of options for the graph constructor. See Micrograph function.
+ * @param {Function} [callback] optional callback function that will be invoked with the new graph instance.
+ */
 Micrograph.create = function() {
     var callback, options;
 
-    if(arguments.length == 0) {
+    if(arguments.length === 0) {
 	throw "A callback function and an optional options map must be provided";
     } else if(arguments.length == 1) {
 	options = {'treeOrder': 15, 'name': 'micrograph_instance', 'overwrite':false};
@@ -10050,31 +9004,23 @@ Micrograph.create = function() {
     new Micrograph(options, callback);
 };
 
-Micrograph.open = function(name,overwrite,options,callback) {
-    if(callback == null) {
-	if(typeof(options) === 'function') {
-	    callback = options;
-	    options = {};
-	}  else {
-	    throw "Persistent storage requires a callback functon"
-	}
-    }
-    options['persistent'] = true;
-    options['name'] = name;
-    options['overwrite'] = overwrite;
-    
-    new Micrograph(options, callback);
-};
-
+/**
+ * Defines a new class for the for the expression and prototype object passes as parameters.
+ *
+ * @param {String} [classExpression] a expression consisting of a $type name a property name using the syntax prop(), and the connectives: and, or, not.
+ * @params {Object} [object] prototype object with the functions and optional initialiser that will be added to all nodes in this class.
+ */
 Micrograph.prototype.define = function(classExpression, object) {
     MicrographClass.define(classExpression, object);
     return this;
 };
 
+/*
 Micrograph.prototype.resource = function(resource) {
     this.resources.push(resource);
     return this;
 };
+
 
 Micrograph.prototype.resourceAccepts = function(resource,obj) {
     if(resource['$type']){
@@ -10099,9 +9045,16 @@ Micrograph.prototype.resourceAccepts = function(resource,obj) {
     } else
 	return false;
 };
+*/
 
+/**
+ * Transforms a JSON representation of a node into a JSON object without any special property: $id, $type, $from, $state.
+ * Currently, no cyclic dependencies will be resolved.
+ *
+ * @param {Object} [obj] The object to be transformed
+ */
 Micrograph.prototype.toJSON = function(obj) {
-    var json = JSON.parse(JSON.stringify(obj));
+    var json = Micrograph.clone(obj);
     var acum = [json];
     var current;
     while(acum.length > 0) {
@@ -10112,8 +9065,8 @@ Micrograph.prototype.toJSON = function(obj) {
 	} else {
 	    for(var p in current) {
 		if(p=='$id' || p=='$type' || p=='$from' || p.indexOf("$in") != -1 || 
-		   p=='$state' || p.indexOf("__")==0 || typeof(current[p])==='function')
-		    delete current[p]
+		   p=='$state' || p.indexOf("__")===0 || typeof(current[p])==='function')
+		    delete current[p];
 		else if(current[p] && typeof(current[p]) === 'object' && current[p].constructor != Date) 
 		    acum.push([p,current[p]]);
 	    }
@@ -10207,18 +9160,23 @@ Micrograph.prototype.sync = function(cb) {
 };
 */
 
+/**
+ * Check for all defined classes where this object is included, run the initialisers and append class functions
+ *
+ * @object {Object} [object] JSON encoded graph node.
+ */
 Micrograph.prototype.instantiate = function(object) {
-    if(object['__micrograph__classes'] != null) {
-	return this;
-    }
+    if(object['__micrograph__classes'] != null)
+     	return this;
     
     MicrographClass.check(object);
     for(var p in object) {
-	if(typeof(object[p]) === 'object' && object[p]!=null) {
+	if(typeof(object[p]) === 'object' && object[p] !== null && object[p] !== undefined) {
 	    if(object[p].constructor == Array) {
-		for(var i=0; i<object[p].length; i++)
+		for(var i=0; i<object[p].length; i++) {
 		    if(typeof(object[p][i]) === 'object' && object[p][i].$id)
 			this.instantiate(object[p][i]);
+		}
 	    } else {
 		if(object[p].$id)
 		    this.instantiate(object[p]);
@@ -10230,6 +9188,11 @@ Micrograph.prototype.instantiate = function(object) {
 
 Micrograph.prototype.modificationName = null;
 
+/**
+ * Starts generating recording events for a group of graph operations. Events will be triggered once endGraphModification is invoked.
+ *
+ * @param {String} [name] Identifier for the batch of graph operations.
+ */
 Micrograph.prototype.startGraphModification = function(name) {
     if(name != null && this.modificationName!=null)
 	throw("Modification already being executed");
@@ -10241,6 +9204,11 @@ Micrograph.prototype.startGraphModification = function(name) {
     }
 };
 
+/**
+ * Finished a group of graph operations triggering the recorded events.
+ *
+ * @param {String} [name] Identifier of the batch of graph operations to trigger.
+ */
 Micrograph.prototype.endGraphModification = function(name) {
     if(name === this.modificationName || this.modificationName == null) {
 	this.modificationName = null;
@@ -10248,6 +9216,12 @@ Micrograph.prototype.endGraphModification = function(name) {
     }
 };
 
+/**
+ * Executes a query on the graph.
+ *
+ * @param {Object} [query] JSON encoded query pattern.
+ * @param {Function} [callback] Function that will be invoked with the results of the query.
+ */
 Micrograph.prototype.execute = function(query, callback) {
     this.startGraphModification();
     this.engine.execute(query,callback);
@@ -10255,6 +9229,11 @@ Micrograph.prototype.execute = function(query, callback) {
     return this;
 };
 
+/**
+ * Initiates a data selection based on the query pattern passed as a parameter.
+ *
+ * @param {Object} [query] JSON encoded query pattern
+ */
 Micrograph.prototype.where = function(query) {
     var queryObj =  new MicrographQuery(query);
     this.lastQuery = queryObj;
@@ -10262,10 +9241,32 @@ Micrograph.prototype.where = function(query) {
     return queryObj;
 };
 
+/**
+ * Inititates a data selection based on the path traversal passed as a parameter.
+ *
+ * @param {String} [path] a SPARQL path expression
+ */
+Micrograph.prototype.traverse = function(path) {
+    
+    var template = {'$id': this._('start')};
+    template[path] = this._('end');
+    var queryObj =  new MicrographQuery(template);
+    this.lastQuery = queryObj;
+    queryObj.setStore(this);
+    queryObj.setKind('traverse');
+    return queryObj;
+};
+
+/**
+ * Triggers a data selection execution returning the results as instances
+ *
+ * @param {Function} [callback] Callback function receiving the resulting instances.
+ */
 Micrograph.prototype.instances = function(callback) {
     if(this.lastQuery.lastResult && this.lastQuery.lastResult.constructor === Array) {
 	for(var i=0; i<this.lastQuery.lastResult.length; i++)
 	    this.instantiate(this.lastQuery.lastResult[i]);
+
 	callback(this.lastQuery.lastResult);
     } else if(this.lastQuery.lastResult) {
 	this.instantiate(this.lastQuery.lastResult);
@@ -10277,10 +9278,21 @@ Micrograph.prototype.instances = function(callback) {
 };
 
 
+/**
+ * Auxiliary function used to introduce variables in a tuple query
+ *
+ * @param {String} [varName] Name of the variable.
+ */
 Micrograph.prototype._ = function(varName) {
     return {'token': 'var', 'value':varName };
 };
 
+/**
+ * Transforms a JSON object with nested objects into an array of flatten JSON objects
+ *
+ * @param {Object} [data] The JSON object to be normalised.
+ * @param {bool} [oneLevel] If set to true, only objects at one level depth will be processed
+ */
 Micrograph.normalize = function(data, oneLevel) {
     oneLevel = oneLevel || false;
     var acum = [data];
@@ -10306,7 +9318,7 @@ Micrograph.normalize = function(data, oneLevel) {
 			acum.push(next);
 		} else if(current[p] && typeof(current[p]) === 'object' && current[p].constructor == Array) {
 		    tmp = [];
-		    for(var i=0; i<current[p].length; i++) {
+		    for(i=0; i<current[p].length; i++) {
 			if(!oneLevel || current[p][i]['$id']==null)
 			    acum.push(current[p][i]);
 			if(current[p][i].$id != null)		
@@ -10325,6 +9337,12 @@ Micrograph.normalize = function(data, oneLevel) {
     return toReturn;
 };
 
+/**
+ * Inserts the current data selection into the graph.
+ *
+ * @param {Object} [data] Data to be loaded. If no data is passed, the current selection is used.
+ * @param {Function} [callback] Mandatory callback function that will be invoked when the data has been loaded into the graph.
+ */
 Micrograph.prototype.load = function() {
     var mediaType;
     var data;
@@ -10351,27 +9369,45 @@ Micrograph.prototype.load = function() {
     graph = {'token':'uri', 'value': this.engine.lexicon.defaultGraphUri};
 
     if(this.lastDataToLoad != null) {
-	var options = this.lastDataToLoad;
-	this.lastDataToLoad = null;
-	if(options['jsonp'] != null) {
-	    Micrograph.jsonp(options['uri'], function(data) {
-		that.load(data,callback);
-	    }, this.errorCallback, options['jsonp']);
+	if(this.lastDataToLoad.constructor === Array) {
+	    data = [];
+	    var acum = this.lastDataToLoad;
+	    Utils.repeatAsync(0,acum.length, function(k,env) {
+		var floop = arguments.callee;
+		that.lastDataToLoad = acum[env._i];
+		that.defaultFrom = acum[env._i]['uri'];
+		that.load(function(result) {
+		    if(result.constructor && result.constructor === Array) {
+			data = data.concat(result);
+		    } else {
+			data.push([acum[env._i]['uri'],result]);
+		    }
+		    k(floop,env);
+		});
+	    }, function() {
+		callback(data);
+	    });
 	} else {
-	    Micrograph.ajax('GET', options['uri'], null, function(data){
-		that.load(data,callback);
-	    }, this.errorCallback);
+	    var options = this.lastDataToLoad;
+	    this.lastDataToLoad = null;
+	    if(options['jsonp'] != null) {
+		Micrograph.jsonp(options['uri'], function(data) {
+		    that.load(data,callback);
+		}, this.errorCallback, options['jsonp'], options);
+	    } else {
+		Micrograph.ajax('GET', options['uri'], options, null, function(data){
+		    that.load(data,callback);
+		}, this.errorCallback);
+	    }
 	}
 	return this;
-    }
-
-    if(typeof(data) === "object") {
+    } else if(typeof(data) === "object") {
 	if(data.constructor !== Array) {
 	    data = [data];
 	}
 
 	if(this.transformFunction != null) {
-	    var acum = [[null,data]];
+	    acum = [[null,data]];
 	    var current;
 	    while(acum.length > 0) {
 		current = acum.pop();
@@ -10379,7 +9415,11 @@ Micrograph.prototype.load = function() {
 		    for(var i=0; i<current[1].length; i++)
 			acum.push([current[0], current[1][i]]);
 		} else {
-		    this.transformFunction(current[0],current[1]);
+		    var uriFrom = null;
+		    if(this.defaultFrom != null)
+			uriFrom = (this.defaultFrom.indexOf("?") != -1 ? this.defaultFrom.split("?")[0] : this.defaultFrom);
+
+		    this.transformFunction(current[0],current[1], uriFrom);
 		    for(var p in current[1]) {
 			if(current[1][p] && typeof(current[1][p]) === 'object' && current[1][p].constructor != Date) 
 			    acum.push([p,current[1][p]]);
@@ -10391,9 +9431,8 @@ Micrograph.prototype.load = function() {
 	//this.transformFunction = null;
 
 	var quads;
-	var that = this;
 
-	for(var i=0; i<data.length; i++) {
+	for(i=0; i<data.length; i++) {
 	    quads = MicrographQL.parseJSON(data[i],graph, this.defaultFrom, this.defaultState);
 
 	    //console.log("LOAD");
@@ -10415,7 +9454,14 @@ Micrograph.prototype.load = function() {
 
 };
 
+/**
+ * Saves a single JSON object into the data graph.
+ *
+ * @param {Object} [json] Data to be stored in the graph.
+ * @param {Function} [cb] Optional callback function that will be inovoked once the data is saved.
+ */
 Micrograph.prototype.save = function(json,cb) {
+    this.transformFunction = null;
     this.load(json, function(objects){
 	if(cb)
 	    cb(objects[0]);
@@ -10423,30 +9469,107 @@ Micrograph.prototype.save = function(json,cb) {
     return this;
 };
 
-Micrograph.prototype.update = function(json, cb) {
+/**
+ * Removes a single node from the data graph.
+ *
+ * @param {Object} [node] JSON encoded node graph with a valid $id property.
+ * @param {Function} [cb] Callback function that will be invoked after the node has been removed.
+ */
+Micrograph.prototype.removeNode = function(node, cb) {
+    if(typeof(node) === 'string') 
+	node = {'$id': node};
+
+    var query = new MicrographQuery({'$id':node.$id});
+    query.setStore(this);
+
+    query._unlinkNode(node['$id'],cb,true);
+    if(this.nodeDeletedCallback)
+	this.nodeDeletedCallback(node);
+    return this;
+};
+
+/**
+ * Updates a single graph node.
+ *
+ * @param {Object} [json] JSON encoded node graph with a valid $id property.
+ * @param {bool} [processInverse] If set to true, inverse links will also be udpated. Optional.
+ * @param {Function} [callback] Function that will be invoked once the graph node has been updated.
+ */
+Micrograph.prototype.updateNode = function() {
+    var json, processInverse, cb;
+    if(arguments.length === 1) {
+	json = arguments[0];
+	processInverse = false;
+	cb = null;
+    } else if(arguments.length === 2) {
+	json = arguments[0];
+	if(typeof(arguments[1]) === 'function') {
+	    cb = arguments[1];
+	    processInverse = false;
+	} else {
+	    cb = null;
+	    processInverse = arguments[1];
+	}
+    } else if(arguments.length === 3){
+	json = arguments[0];
+	processInverse = arguments[1];
+	cb = arguments[2];
+    } else {
+	if(cb)
+	    cb(false,"Wrong number of arguments for update, only 1, 2 or 3 args allowd, received "+arguments.length);
+	else
+	    throw "Wrong number of arguments for update, only 1, 2 or 3 args allowd, received "+arguments.length;
+    }
     var id = json['$id'];
-    if(id == null) {
-	cb(false,"ID must be provided");
+    if(!id) {
+	if(cb)
+	    cb(false,"ID must be provided");
+	else 
+	    throw "ID must be provided to update";
     } else {
 
-	var normalized = Micrograph.normalize(json,true);
+	// remove inverse nodes if not selected
+        for(p in json) {
+	    if(p.indexOf("$in") != -1 && !processInverse) {
+		delete json[p];
+	    }
+	}
+
+	// from a collection of nested nodes to a list of flat nodes, just one level of nesting
+	normalized = Micrograph.normalize(json,true);
+
 	var that = this, current;
 	that.startGraphModification('update');	
 	for(var i=0; i<normalized.length; i++) {
 	    current = normalized[i];
-	    if(current.$id != null && current.$id === id) {
+	    if(current.$id && current.$id === id) {
 		this.where({'$id': current.$id})._unlinkNode(current.$id,function(success, _){
 		    if(success) {
-			that.defaultState = 'dirty'
+			that.defaultState = 'dirty';
 			that.save(current);
+
+			if(that.nodeUpdatedCallback)
+			    that.nodeUpdatedCallback(current);
+
 		    } else {
-			cb(false);
+			if(cb)
+			    cb(false);
 		    }
-		}, true);
-	    } else {
-		this.defaultState = 'created'
-		that.save(current);
+		}, 
+		// should we remove als arcs in
+                (processInverse ? false : true));
 	    }
+	    // No longer necessary, if no $id will be
+	    // linked to the top level node and processed
+	    // in the previous save call
+
+	    //} else {
+	    // 	if(!current['$id']) {
+	    // 	    // only blank nodes can get here
+	    // 	    this.defaultState = 'created';
+	    // 	    that.save(current);
+	    // 	}
+	    //}
 	}
 	that.endGraphModification('update');
 	if(cb)
@@ -10454,15 +9577,130 @@ Micrograph.prototype.update = function(json, cb) {
     }
 };
 
-Micrograph.prototype.bind = function(query, callback) {
+/**
+ * Updates the state of a node in the graph without modifying any other piece of state.
+ *
+ * @param {Object}  [nodeOrID] JSON encoded node or string with the $id of the node whose state must be updated.
+ * @param {String} [state] The new state for the node.
+ */
+Micrograph.prototype.setState = function(nodeOrID, state) {
+    var id = nodeOrID
+    if(typeof(nodeOrID)==='object') {
+	id = nodeOrID['$id'];
+    }
+
+    if(id != null) {
+	// just calling parseModify to build the pattern
+	var query = MicrographQuery.prototype._parseModify({'$id':id});
+	var queryPattern = {
+	    subject: {'token':'uri', 'value':MicrographQL.base_uri+id},
+	    predicate: {'token':'uri', 'value':MicrographQL.base_uri+"state"},
+	    object: {
+                  "token": "var",
+                  "value": "person"
+            }
+	};
+	var insertPattern = {
+	    subject: {'token':'uri', 'value':MicrographQL.base_uri+id},
+	    predicate: {'token':'uri', 'value':MicrographQL.base_uri+"state"},
+	    object: MicrographQL.parseLiteral(state)
+	};
+	query.query.units[0].pattern.patterns[0].triplesContext = [queryPattern];
+	query.query.units[0].pattern.filters = null;
+	query.query.units[0]['delete'] = [queryPattern];
+	query.query.units[0]['insert'] = [insertPattern];
+
+
+	this.engine.execute(query.query, function(res){});
+	
+    } else {
+	throw "A node or node ID must be provided to setState";
+    }
+};
+
+/**
+ * Sets the $id value for an already existing graph node.
+ *
+ * @param {Object}  [nodeOrID] JSON encoded node or string with the $id of the node whose state must be updated.
+ * @param {String} [state] The new $id value for the node.
+ */
+Micrograph.prototype.setId = function(nodeOrID, newID) {
+    var id = nodeOrID
+    if(typeof(nodeOrID)==='object') {
+	id = nodeOrID['$id'];
+    }
+    if(MicrographQL.isUri(newID)) 
+       newID = {'token':'uri', 'value':newID};
+    else
+       newID = {'token':'uri', 'value':MicrographQL.base_uri+newID};
+
+    if(id != null) {
+	// just calling parseModify to build the pattern
+	var query = MicrographQuery.prototype._parseModify({'$id':id});
+	var queryPattern = {
+	    subject: {'token':'uri', 'value':MicrographQL.base_uri+id},
+	    predicate: {'token':'var', 'value':'p'},
+	    object: { "token": "var", "value": "o"}
+	};
+	var insertPattern = {
+	    subject: newID,
+	    predicate: {'token':'var', 'value':'p'},
+	    object: {'token':'var', 'value':'o'}
+	};
+	query.query.units[0].pattern.patterns[0].triplesContext = [queryPattern];
+	query.query.units[0].pattern.filters = null;
+	query.query.units[0]['delete'] = [queryPattern];
+	query.query.units[0]['insert'] = [insertPattern];
+
+
+	this.engine.execute(query.query, function(res){});
+
+	queryPattern = {
+	    object: {'token':'uri', 'value':MicrographQL.base_uri+id},
+	    predicate: {'token':'var', 'value':'p'},
+	    subject: { "token": "var", "value": "s"}
+	};
+	insertPattern = {
+	    object: newID,
+	    predicate: {'token':'var', 'value':'p'},
+	    subject: {'token':'var', 'value':'s'}
+	};
+	
+	var query = MicrographQuery.prototype._parseModify({'$id':id});
+	query.query.units[0].pattern.patterns[0].triplesContext = [queryPattern];
+	query.query.units[0].pattern.filters = null;
+	query.query.units[0]['delete'] = [queryPattern];
+	query.query.units[0]['insert'] = [insertPattern];
+
+
+	this.engine.execute(query.query, function(res){});
+	
+    } else {
+	throw "A node or node ID must be provided to setId";
+    }
+};
+
+/**
+ * Registers a query that will be re-evaluated according to changes in the graph data.
+ *
+ * @param {Object} [query] JSON encoded query pattern.
+ * @param {MicrographQuery} [mg_query]  MicrographQuery object with the context of the query to be bound.
+ * @param {Function} [callback] Callback function that will be bound 
+ */
+Micrograph.prototype.bind = function(query, mg_query, callback) {
     // execution
     var queryIdentifier = 'cb'+this.callbackCounter;
     this.callbackCounter++;
+    var filters = mg_query.filter;
 
     var that = this;
     var nodesMap = {};
 
     var innerCallback = function(results) {
+	mg_query.filter = filters;
+	filters = mg_query.filter.concat([]);
+	// filters are shifted while processing, we keep a copy in a new array
+
 	results = MicrographQuery._processQueryResults(results, query.topLevel, query.varsMap, query.inverseMap, that);
 	for(var i=0; i<results.length; i++) {
 	    var id = results[i]['$id'];
@@ -10471,81 +9709,254 @@ Micrograph.prototype.bind = function(query, callback) {
 		nodesMap[id] = true;
 	    }
 	}
-	callback(results);
-    };
-    this.callbackToInner[callback] = innerCallback;
-    this.callbackMap[queryIdentifier] = innerCallback;
 
+	if(mg_query.filter.length>0) {
+	    mg_query._applyResultFilter(results, function(res) {
+		callback(res,queryIdentifier);
+	    });
+	} else {	
+	    if(mg_query.groupPredicate != null) 
+		mg_query._groupResults(results, function(res){
+		    callback(res,queryIdentifier);
+		});
+	    else
+		callback(results, queryIdentifier);
+	}
+    };
+    this.callbackToInner[callback] = queryIdentifier;
+    this.callbackMap[queryIdentifier] = innerCallback;
     this.engine.callbacksBackend.observeQuery(queryIdentifier, query.query,innerCallback,function() {});
+    return this;
 };
 
+/**
+ * Unregisters a callback function.
+ *
+ * @param {Object} [queryIdentifier] String query ID passed to the callback function in function invocations or the callback function object.
+ */
+Micrograph.prototype.unbind = function(queryIdentifier) {
+    if(typeof(queryIdentifier) === 'function')
+	queryIdentifier = this.callbackToInner[queryIdentifier];
+
+    if(queryIdentifier)
+	this.engine.callbacksBackend.stopObservingQuery(queryIdentifier);
+
+    return this;
+};
+
+/**
+ * Creates a data selection from a remote data source using an AJAX+CORS or JSONP request.
+ *
+ * @param {String} [uri] URI where the data will be retrieved.
+ * @param {Object} [options] Hash of options for the remote request.
+ * <ul>
+ *  <li> media: Media type to request and process. Possible values are: microdata and n3. If none is specifed JSON will be requested.</li>
+ *  <li> jsonp: If a JSONP request must be used, name of the callback or true for a name to be randomly generaed </li>
+ *  <li> crossDomain: will force the use of XDomainRequest object in IE browsers not supporting CORS</li>
+ *  <li> callback: Name of the callback parameter for the JSONP request.</li>
+ *  <li> timeout: Max. number of milliseconds before the JSONP request times out.</li>
+ *  <li> maxRetries: Max. number of times the JSONP request will be retrievd before giving up.</li>
+ *  <li> result: Optional name of property in a JSONP response where the actual answer data is stored.</li>
+ * </ul>
+ * @param {Function} [callback] Function that will be invoked when the data have been retrieved.
+ */
 Micrograph.prototype.from = function(uri, options, callback) {
-    if(options == null) {
+    this.transformFunction = null;
+    if(!options) {
 	options = {};
     } else if(typeof(options) === 'function'){
-	callback = options
+	callback = options;
 	options = {};
     }
+    var baseUri = uri, acum;
+    if(typeof(uri) === 'object' && uri.constructor === Array) {
+	baseUri = [];
+	acum = [];
+	for(var i=0; i<uri.length; i++) {
+	    var thisOptions = {};
+	    for(var p in options)
+		thisOptions[p] = options[p];
 
-    var baseUri = uri;
-    if(baseUri.indexOf("?") != -1) {
-	baseUri = baseUri.split("?")[0];
-    }
-    this.defaultFrom = baseUri;
-    this.defaultState = 'loaded';
-    
+	    if(uri[i].indexOf("?") != -1) {
+		baseUri.push(uri[i].split("?")[0]);
+	    }
+	    if(uri[i].indexOf("?") != -1 && uri[i].split("?")[1].indexOf("callback") != -1 && options['jsonp'] == null) {
+		thisOptions['jsonp'] = 'callback';
+	    }
+	    thisOptions['uri'] = uri[i];
+	    acum.push(thisOptions);
+	}
+	this.defaultFrom = baseUri;
+	this.defaultState = 'loaded';	
 
-    if(uri.indexOf("?") != -1 && 
-       uri.split("?")[1].indexOf("callback") != -1 &&
-       options['jsonp'] == null) {
-	options['jsonp'] = 'callback';
-    }
-
-    options['uri'] = uri;
-    if(callback != null) {
-	this.lastDataToLoad = null;
-	if(options['jsonp'] != null) {
-	    Micrograph.jsonp(options['uri'], callback, this.errorCallback, this.options['jsonp'])
+	if(callback != null) {
+	    var that = this;
+	    var data = [];
+	    Utils.repeatAsync(0,acum.length, function(k,env) {
+		var floop = arguments.callee;
+		that.from(acum[env._i]['uri'], acum[env._i], function(result) {
+		    data.push(result);
+		    k(floop,env);
+		});
+	    }, function() {
+		callback(data);
+	    });
 	} else {
-	    Micrograph.ajax('GET', options['uri'], null, callback, this.errorCallback)
+	    this.lastDataToLoad = acum;
 	}
     } else {
-	this.lastDataToLoad = options;
+	if(baseUri.indexOf("?") != -1) {
+	    baseUri = baseUri.split("?")[0];
+	}
+	if(uri.indexOf("?") != -1 && uri.split("?")[1].indexOf("callback") != -1 && options['jsonp'] == null) {
+	    options['jsonp'] = 'callback';
+	}
+	options['uri'] = uri;
+	this.defaultFrom = baseUri;
+	this.defaultState = 'loaded';	
+
+	if(callback != null) {
+	    this.lastDataToLoad = null;
+	    if(options['jsonp'] != null) {
+		Micrograph.jsonp(options['uri'], callback, this.errorCallback, options['jsonp'], options);
+	    } else {
+		Micrograph.ajax('GET', options['uri'], options, null, callback, this.errorCallback);
+	    }
+	} else {
+	    this.lastDataToLoad = options;
+	}
     }
-
     return this;
 };
 
-Micrograph.prototype.transform = function(f) {
-    this.transformFunction = f;
+Micrograph._parseTransformFunction = function(spec) {
+    return function(prop, obj) {
+	if(prop == null && spec['null'] != null)
+	    prop = 'null';
+
+	if(spec[prop]) {
+	    for(var p in spec[prop]) {
+		if(p === '@delete') {
+		    if(spec[prop][p].constructor === Array)  {
+			for(var i=0; i<spec[prop][p].length; i++)
+			    delete obj[spec[prop][p][i]];
+		    } else 
+			delete obj[spec[prop][p]];
+		} if(p === '@id'){
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj['$id'] = spec[prop][p](obj);
+		    } else {
+			obj['$id'] = obj[spec[prop][p]];
+		    }
+		} else if(p === '@type') {
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj['$type'] = spec[prop][p](obj);
+		    } else  {
+			obj['$type'] = obj[spec[prop][p]];
+		    }
+		} else if(p === '@from') {
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj['$from'] = spec[prop][p](obj);
+		    } else  {
+			obj['$from'] = obj[spec[prop][p]];
+		    }
+		} else {
+		    if(typeof(spec[prop][p]) === 'function') {
+			obj[p] = spec[prop][p](obj);
+		    } else  {
+			obj[p] = obj[spec[prop][p]];
+		    }
+		}
+	    }
+
+	}
+    };
+};
+
+/**
+ * Function that will be applied to the data retrieved from a remote selection.
+ *
+ * @param {Function} [cb] Transformation function that will be applied.
+ */
+Micrograph.prototype.transform = function(cb) {
+    if(typeof(cb) === 'object') 
+	cb = Micrograph._parseTransformFunction(cb);
+    this.transformFunction = cb;
     return this;
 };
 
-Micrograph.ajax = function(method, url, data, callback, errorCallback) {
+/**
+ * Makes an AJAX+CORS request to retrieve remote data. In IE browser version<10, a XDomainRequest
+ * will be tried instead.
+ *
+ * @param {String} [method] Method for the request.
+ * @param {String} [url] Remote URI.
+ * @param {Object} [options] Hash of options, see from documentation for the list of available options.
+ * @param {Object} [data] JSON object of data that will be send in POST requests.
+ * @param {Function} [callback] Callback function that will be invoked on successful completion of the request.
+ * @param {Function} [errorCallback] Optional callback function that will be invoked if the request fails.
+ */
+Micrograph.ajax = function(method, url, options, data, callback, errorCallback) {
+    var dataFormat = options['media'];
+    if(dataFormat == null || dataFormat === "json")
+	dataFormat = "application/json";
+    else if(dataFormat === "n3" ||  dataFormat === "turtle" || dataFormat === "ttl")
+	dataFormat = "text/n3";
+    else if(dataFormat === "microdata")
+	dataFormat = "text/html";
+
+    var handleResponse = function(responseText) {
+	var resultData;
+	if(dataFormat === "application/json")
+	    resultData = JSON.parse(responseText);
+	else if(dataFormat === "text/n3")
+	    resultData = Micrograph.n3(url, responseText, options);
+	else if(dataFormat === "text/html" && options['media'] === "microdata") {
+	    var tempDiv = document.createElement('div');
+	    tempDiv.innerHTML = responseText.replace(/<script(.|\s)*?\/script>/g, '');
+	    var md = new Microdata(url, tempDiv);
+	    resultData = md.parse();
+	}
+
+	callback(resultData, xhr);
+    };
 
     var xhr = new XMLHttpRequest();
 
-    if (typeof XDomainRequest != "undefined") {
+    if (typeof XDomainRequest != "undefined" && !xhr["withCredentials"] && options["crossDomain"]) {
 	// XDomainRequest for IE.
+
 	xhr = new XDomainRequest();
 	xhr.open(method, url);
+	xhr.onload = function() {
+	    handleResponse(xhr.responseText);
+	};
+
     } else {
 	xhr.open(method, url, true);
+
+	if (xhr.overrideMimeType) xhr.overrideMimeType(dataFormat);
+	if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", dataFormat);
+
+	if(data != null && xhr.setRequestHeader)
+	    xhr.setRequestHeader("Content-Type", dataFormat);
+
+	xhr.onreadystatechange = function() {
+	    if (xhr.readyState === 4) {
+		if(xhr.status < 300 && xhr.status !== 0) {
+		    handleResponse(xhr.responseText)
+		} else {
+		    if(errorCallback)
+			errorCallback(xhr.statusText, xhr);
+		}
+	    }
+	};
     }
 
-    if (xhr.overrideMimeType) xhr.overrideMimeType("application/json");
-    if (xhr.setRequestHeader) xhr.setRequestHeader("Accept", "application/json");
 
-    if(data != null && xhr.setRequestHeader)
-	xhr.setRequestHeader("Content-Type", "application/json");
-
-    xhr.onreadystatechange = function() {
-	if (xhr.readyState === 4) {
-	    if(xhr.status < 300 && xhr.status !== 0)
-		callback(JSON.parse(xhr.responseText), xhr);
-	    else
-		errorCallback(xhr.statusText, xhr);
-	}
+    xhr.onerror = function(e) {
+	if(errorCallback)
+	    errorCallback("XHR Error", e);
     };
 
     xhr.send(data);
@@ -10555,12 +9966,69 @@ Micrograph.jsonpCallbackCounter = 0;
 Micrograph.jsonpRequestsConfirmations = {};
 Micrograph.jsonpRetries = {};
 
-Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, ignore) {
+/**
+ * Parses Microdata information in some text string.
+ *
+ * @param {String} [from] Base URI where the HTML+Microdata text was retrieved.
+ * @param {String} [data] String containing the Microdata markdown to be parsed.
+ * @param {Object} [options] Option hash of options for the parser.
+ * @param {Function} [cb] Callback function that will be invoked with the results.
+ */
+Micrograph.prototype.microdata = function(from, data, options, cb) {
+    var tempDiv = document.createElement('div');
+    if(typeof(options) === "function")
+	cb = options;
+    tempDiv.innerHTML = data.replace(/<script(.|\s)*?\/script>/g, '');
+
+    var md = new Microdata(from, tempDiv);
+    var nodes = md.parse();
+
+    this.load(nodes, cb);
+
+    return this;
+};
+
+
+/**
+ * Parses N3 information in some text string. This is just a wrapper method for the actual parser in the n3 module.
+ *
+ * @param {String} [from] Base URI where the N3 text was retrieved.
+ * @param {String} [data] String containing the N3 markdown to be parsed.
+ * @param {Object} [options] Option hash of options for the parser.
+ * @param {Function} [cb] Callback function that will be invoked with the results.
+ */
+Micrograph.prototype.n3 = function(from, data, options, cb) {
+    if(Micrograph.n3)
+	this.load(Micrograph.n3(from, data, options), cb);
+    else
+	throw "N3 Parser not available";
+    return this;
+};
+
+/**
+ * Makes an JSONP request to retrieve remote data. In IE browser version<10, a XDomainRequest
+ * will be tried instead.
+ *
+ * @param {String} [fragment] Remote URI it may include the callback parameter.
+ * @param {Function} [callback] Callback function that will be invoked on successful completion of the request.
+ * @param {Function} [errorCallback] Optional callback function that will be invoked if the request fails.
+ * @param {String} [callbackParameter] Optional name for the callback parameter, otherwise it will be looked fo in the fragment or finally 'callback' will be used by default.
+ * @param {Object} [options] Hash of options, see from documentation for the list of available options.
+ */
+Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter, options, ignore) {
     ignore = ignore || false;
-    var cbHandler = "jsonp"+Micrograph.jsonpallbackCounter;
+    options = options || {};
+    var baseURI = options['base'] || fragment;
+    var maxRetries = options['retries'];
+    if(maxRetries == null && maxRetries !== 0)
+	maxRetries = 1;
+
+    var timeout = options['timeout'] || 15000;
+
+    var cbHandler = "jsonp"+Micrograph.jsonpCallbackCounter;
     Micrograph.jsonpCallbackCounter++;
 
-    if(callbackParameter == null)
+    if(callbackParameter == null || typeof(callbackParameter) !== "string")
 	callbackParameter = "callback";
 
     var uri = fragment;
@@ -10576,14 +10044,29 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
 	}
     }
 
-    if(Micrograph.jsonpRetries[uri] == null) {
-	Micrograph.jsonpRetries[uri] = 0;
+    if(Micrograph.jsonpRetries[fragment] == null) {
+	Micrograph.jsonpRetries[fragment] = 0;
     } else {
-	Micrograph.jsonpRetries[uri] = Micrograph.jsonpRetries[uri]+1;
+	Micrograph.jsonpRetries[fragment] = Micrograph.jsonpRetries[fragment]+1;
     }
     window[cbHandler] = function(data) {
-	Micrograph.jsonpRequestsConfirmations[uri] = true;
-	callback(data);
+	try {
+	    Micrograph.jsonpRequestsConfirmations[uri] = true;
+	    if(options['result'])
+		data = data[options['result']];
+	    if(options['media'] && options['media'] === 'n3') {
+		resultData = Micrograph.n3(baseURI, data, options);
+	    } else if(options['media'] && options['media'] === 'microdata') {
+		var tempDiv = document.createElement('div');
+		tempDiv.innerHTML = data.replace(/<script(.|\s)*?\/script>/g, '');
+		var md = new Microdata(baseURI, tempDiv);
+		data = md.parse();
+	    }
+	    callback(data);
+	}catch(e) {
+	    if(errorCallback)
+		errorCallback("Error processing JSONP results for media type  "+options['media']+": "+e);
+	}
     };
 
     setTimeout(function() {
@@ -10592,7 +10075,7 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
 	    delete Micrograph.jsonpRequestsConfirmations[uri];
 	    delete window[cbHandler];
 	} else {
-	    if(Micrograph.jsonpRetries[uri] < 1) {
+	    if(Micrograph.jsonpRetries[fragment] < maxRetries) {
 		console.log("(!!) JSONP error, retyring...");
 		console.log(fragment);
 		console.log(callbackParameter);
@@ -10600,17 +10083,17 @@ Micrograph.jsonp = function(fragment, callback, errorCallback, callbackParameter
 		if(ignore) {
 		    callback(null);
 		} else {
-		    Micrograph.jsonp(fragment, callback, errorCallback, callbackParameter, ignore);
+		    Micrograph.jsonp(fragment, callback, errorCallback, callbackParameter, options, ignore);
 		}
 	    } else {
-		delete Micrograph.jsonpRetries[uri];
+		delete Micrograph.jsonpRetries[fragment];
 		delete Micrograph.jsonpRequestsConfirmations[uri];
 		delete window[cbHandler];
 		if(errorCallback)
-		    errorCallback();
+		    errorCallback("Error loading JSONP request "+fragment);
 	    }
 	}
-    }, 15000);
+    }, timeout);
 
     var script = document.createElement('script');
     script.setAttribute('type','text/javascript');
@@ -10656,6 +10139,71 @@ Micrograph._insertDataQuery = function(quads) {
     };
 };
 
+Micrograph._cloneDeep = function() {
+    var options, name, src, copy, copyIsArray, clone,
+    target = arguments[0] || {},
+    length = arguments.length,
+    deep = true;
+    var i = 1;
+
+    // Handle case when target is a string or something (possible in deep copy)
+    if ( typeof target !== "object" && typeof(target) !== "function" ) {
+	target = {};
+    }
+
+    for ( ; i < length; i++ ) {
+	// Only deal with non-null/undefined values
+	if ( (options = arguments[ i ]) != null ) {
+	    // Extend the base object
+	    for ( name in options ) {
+		src = target[ name ];
+		copy = options[ name ];
+
+		// Prevent never-ending loop
+		if ( target === copy ) {
+		    continue;
+		}
+
+		// Recurse if we're merging plain objects or arrays
+		if ( deep && copy && ( typeof(copy) == "object" || (copyIsArray = (copy.constructor === Array)) ) ) {
+		    if ( copyIsArray ) {
+			copyIsArray = false;
+			clone = src && typeof(src) === Array ? src : [];
+
+		    } else {
+			clone = src && typeof(src) === "object" && src.constructor === Array ? src : {};
+		    }
+
+		    // Never move original objects, clone them
+		    console.log("DEEP COPYING");
+		    console.log(name);
+		    console.log(clone);
+		    target[ name ] = Micrograph._cloneDeep( {}, clone );
+
+		    // Don't bring in undefined values
+		} else if ( copy !== undefined ) {
+		    target[ name ] = copy;
+		}
+	    }
+	}
+    }
+
+    // Return the modified object
+    return target;
+};
+
+/**
+ * Clones an object either using ES5 Object.clone or deep clone from jQuery.
+ *
+ * @param {Object} [obj] The object that will be cloned
+ */
+Micrograph.clone = function(obj) {
+    if(Object.clone) {
+	return Object.clone(obj);
+    } else {
+	return Micrograph._cloneDeep({},obj);
+    }
+};
 // end of ./src/micrograph/src/micrograph.js 
 try {
   if(typeof(window) === 'undefined')

@@ -7364,7 +7364,13 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 		    } else {
 			if(expression[p].constructor == Array) {
 			    for(var i=0; i<expression[p].length; i++) {
-				if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
+				if(expression[p][i] === null) {
+				    object = {'token': 'uri', 'value': MicrographQL.NIL};
+				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
+				    if(graph != null)
+					quad['graph'] = graph;
+				    quads.push(quad);
+				} else if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
 				    result = MicrographQL.parseBGP(expression[p][i], context, false, graph, from, state);
 				    object = result[0];
 				    context.quads = context.quads.concat(result[1]);
@@ -7462,7 +7468,9 @@ MicrographQL.literalToJS = function(object) {
 };
 
 MicrographQL.uriToJS = function(object) {
-    if(object.value.indexOf(MicrographQL.base_uri) != -1) {
+    if(object.value === MicrographQL.NIL) {
+	return null;
+    } if(object.value.indexOf(MicrographQL.base_uri) != -1) {
 	return {'$id': object.value.split(MicrographQL.base_uri)[1] }
     } else {
 	return {'$id': object.value }
@@ -7534,6 +7542,11 @@ MicrographQuery.prototype.setCallback = function(callback) {
  */
 MicrographQuery.prototype.each = function(callback) {
     this.filter.push(['each',callback]);
+    return this;
+};
+
+MicrographQuery.prototype.each_cc = function(callback) {
+    this.filter.push(['each',callback, true]);    
     return this;
 };
 
@@ -8431,30 +8444,57 @@ MicrographQuery._processSingleNodeResults = function(id, resultsNode, node, disa
 MicrographQuery.prototype._applyResultFilter = function(toReturn, callback) {
     var nextFilter = this.filter.shift();
     var filterType = nextFilter[0];
+    var continuation = (nextFilter.length === 3);
+    var continuationFunction = nextFilter[1];
+    if(continuation !== true) {	
+	if(filterType === 'reduce') {
+	    continuationFunction = function(acum, item, k) {
+		k(nextFilter[1](acum,item));
+	    };
+	} else {
+	    continuationFunction = function(item, k) {
+		k(nextFilter[1](item));
+	    };
+	}
+    }
+
     var reduceAcum = null;
     var filtered = [];
     var filteredResult;
     var that = this;
-    Utils.repeat(0,toReturn.length, function(k,env) {
+    Utils.repeatAsync(0,toReturn.length, function(k,env) {
 	var floop = arguments.callee;
 	var result = toReturn[env._i];
+        var args = [];
+
+		  
 	if(filterType === 'reduce') {
 	    reduceAcum = nextFilter[1];
-	    filteredResult = nextFilter[2](reduceAcum, result);
+	    args.push(reduceAcum);
+	    args.push(result);
+	    //filteredResult = nextFilter[2](reduceAcum, result);
 	} else
-	    filteredResult = nextFilter[1](result);
-	if(filterType === 'select') {
-	    if(filteredResult !== false)
-		filtered.push(result);
-	} else {
-	    if(filterType === 'map')
-		filtered.push(filteredResult);
-	    else if(filterType === 'each')
-		filtered.push(result);
-	    else if(filterType === 'reduce')
-		reduceAcum = filteredResult;
-	}
-	k(floop,env);
+	    args.push(result);
+	    //filteredResult = nextFilter[1](result);
+
+        args.push(function(filteredResult){
+	    if(filterType === 'select') {
+		if(filteredResult !== false)
+		    filtered.push(result);
+	    } else {
+		if(filterType === 'map')
+		    filtered.push(filteredResult);
+		else if(filterType === 'each') {
+		    filtered.push(result);
+		} else if(filterType === 'reduce')
+		    reduceAcum = filteredResult;
+	    }
+	    k(floop,env);
+	});
+
+
+	continuationFunction.apply(that,args);
+
     }, function(env) {
 	if(filterType === 'reduce')
 	    filtered = reduceAcum;

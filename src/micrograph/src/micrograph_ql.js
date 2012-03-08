@@ -413,7 +413,13 @@ MicrographQL.parseBGP = function(expression, context, topLevel, graph, from, sta
 		    } else {
 			if(expression[p].constructor == Array) {
 			    for(var i=0; i<expression[p].length; i++) {
-				if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
+				if(expression[p][i] === null) {
+				    object = {'token': 'uri', 'value': MicrographQL.NIL};
+				    var quad = {'subject':subject, 'predicate':predicate, 'object':object};
+				    if(graph != null)
+					quad['graph'] = graph;
+				    quads.push(quad);
+				} else if(typeof(expression[p][i]) === 'object' && expression[p][i].constructor !== Date) {
 				    result = MicrographQL.parseBGP(expression[p][i], context, false, graph, from, state);
 				    object = result[0];
 				    context.quads = context.quads.concat(result[1]);
@@ -511,7 +517,9 @@ MicrographQL.literalToJS = function(object) {
 };
 
 MicrographQL.uriToJS = function(object) {
-    if(object.value.indexOf(MicrographQL.base_uri) != -1) {
+    if(object.value === MicrographQL.NIL) {
+	return null;
+    } if(object.value.indexOf(MicrographQL.base_uri) != -1) {
 	return {'$id': object.value.split(MicrographQL.base_uri)[1] }
     } else {
 	return {'$id': object.value }
