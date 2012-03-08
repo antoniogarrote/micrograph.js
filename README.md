@@ -2,8 +2,6 @@
 
 Graph data layer for client JS applications using JSON, Microdata or RDF.
 
-    var mg = require('micrograph');
-
     mg.create(function(g) {
      	g.save([{$type: 'Person',
      		     name: 'Ludwig',
@@ -44,6 +42,8 @@ The default build of the library does not include persistence or support for the
 
 A detailed description of the library with some examples can be found <a href="http://antoniogarrote.github.com/micrograph.js/index.html">here</a>.
 JSDoc files for the project are available <a href="http://antoniogarrote.github.com/micrograph.js/doc/index.html">here</a>.
+
+For more documentation about the library internals and some performance data check the <a href="htpp://github.com/antoniogarrote/rdfstore-js">RDFStore-JS</a> project.
 
 ## License
 
