@@ -764,6 +764,37 @@ for(var i=0; i<10; i++) {\n\
 \n\
 });',
 	data:true
+    },
+
+    ex30: {
+	source:
+'var query="ipad";\n\
+\n\
+g.from("https://www.googleapis.com/freebase/v1/search?query="+query+"&callback=matches")\n\
+ .load(function() {\n\
+        \n\
+     g.where({name: {$like: "^iPad( [23])?$"}})\n\
+      .map(function(match) {\n\
+         return match.mid;\n\
+      })\n\
+      .each_cc(function(mid, k) {\n\
+          query = JSON.stringify({mid:mid,type:"/base/gadgets/gadget","*":null});\n\
+          g.from("https://www.googleapis.com/freebase/v1/mqlread?query="+query+"&callback=laodgadget")\n\
+           .load(k);\n\
+      })\n\
+      .all(function() {\n\
+\n\
+          g.where({type:"/base/gadgets/gadget",\n\
+                   name: g._("name"),\n\
+                   weight: g._("weight")})\n\
+           .tuples(function(result) {\n\
+               output(result);\n\
+           });\n\
+\n\
+      })\n\
+\n\
+});',
+	data:true
     }
 
 }

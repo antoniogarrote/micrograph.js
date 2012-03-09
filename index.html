@@ -49,7 +49,7 @@
           var exampleIDs = ["ex1", "ex2", "ex3", "ex4", "ex5", "ex6", "ex7", "ex8", "ex9",
                             "ex10", "ex11", "ex12", "ex13", "ex14", "ex15", "ex16", "ex17",
 			    "ex18", "ex19", "ex16b", "ex20", "ex21", "ex22", "ex23", "ex24",
-			    "ex25", "ex25b", "ex26", "ex27", "ex28", "ex29"];
+			    "ex25", "ex25b", "ex26", "ex27", "ex28", "ex29", "ex30"];
 
           for(var i=0; i<exampleIDs.length; i++) {
 	      var id = exampleIDs[i];
@@ -212,7 +212,8 @@
 	      "#ex26": handlers.loadAndPeriodical,
 	      "#ex27": handlers.evaluate,
 	      "#ex28": handlers.evaluate,
-	      "#ex29": handlers.evaluate
+	      "#ex29": handlers.evaluate,
+	      "#ex30": handlers.evaluate
 	  };
 
 	  var tabs = function(root) {
@@ -661,6 +662,26 @@ Additionally, the library provides the <code>transform</code> function, that wil
 		  <div id="ex16b-output-tab" class="tab-content output-tab-content span11" style="display:none"></div>
 		</div>
 	      </div>
+
+	      <h3>Asynchronous Post-Processing</h3>
+
+	      The library offers alternative versions of the post-processing functions that make it possible to execute asynchronous actions, like requesting a remote web resources, inside the post-processing logic. The available functions: <code>each_cc</code>, <code>map_cc</code>, <code>reduce_cc</code> and <code>select_cc</code> have the same semantics than as the regular post-processing functions, but instead of returning the computed value, they receive a <it>continuation</it> function object that must be invoked with the output of the post-processing step, once the asynchronouse action has finished.
+	      <br/>
+	      In the following example, <a href="http://www.freebase.com/">Freebase</a> API is used to search for the weight of all versions of iPad. Results from the original graph query are processed using the <code>each_cc</code> function to insert an asynchronouse additional Freebase query loading the JSON description of each iPad resource:
+
+	      <div class="example row" id="ex30">
+		<div class="tabs-options span11">
+		  <div>
+		    <span><a href="#" class="source-tab selected-tab">source</a></span>
+		    <span><a href="#" class="output-tab">output</a></span>
+		  </div>
+		</div>
+		<div class="row">
+		  <div id="ex30-source-tab" class="tab-content source-tab-content span11"></div>
+		  <div id="ex30-output-tab" class="tab-content output-tab-content span11" style="display:none"></div>
+		</div>
+	      </div>
+
 
 	      <h3>Order and Pagination</h3>
 	      
