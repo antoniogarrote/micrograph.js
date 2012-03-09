@@ -69,6 +69,12 @@ MicrographQuery.prototype.each = function(callback) {
     return this;
 };
 
+
+/**
+ * Asynchronous version of the each function.
+ *
+ * @param {Function} [callback] The function to apply.
+ */
 MicrographQuery.prototype.each_cc = function(callback) {
     this.filter.push(['each',callback, true]);    
     return this;
@@ -85,6 +91,16 @@ MicrographQuery.prototype.map = function(callback) {
 };
 
 /**
+ * Asynchronous version of the map function.
+ *
+ * @param {Function} [callback] The function to apply.
+ */
+MicrographQuery.prototype.map_cc = function(callback) {
+    this.filter.push(['map',callback, true]);
+    return this;
+};
+
+/**
  * Reduces the data selection of the function using the provided initial value for the acumulator and reduce function.
  *
  * @param {Object} [acum] Initial acumulator value.
@@ -95,12 +111,35 @@ MicrographQuery.prototype.reduce = function(acum,callback) {
     return this;
 };
 
+
+/**
+ * Asynchronous version of the reduce function.
+ *
+ * @param {Object} [acum] Initial acumulator value.
+ * @param {Function} [callback] The function to apply. 
+ */
+MicrographQuery.prototype.reduce_cc = function(acum,callback) {
+    this.filter.push(['reduce',acum, callback, true]);
+    return this;
+};
+
+
 /**
  * Filter results from the data section using the provided function as a predicate.
  *
  * @param {Function} [callback] The function to apply.
  */ 
 MicrographQuery.prototype.select = function(callback) {
+    this.filter.push(['select',callback]);
+    return this;
+};
+
+/**
+ * Asynchronous version of the select function
+ *
+ * @param {Function} [callback] The function to apply.
+ */ 
+MicrographQuery.prototype.select_cc = function(callback) {
     this.filter.push(['select',callback]);
     return this;
 };
@@ -967,13 +1006,22 @@ MicrographQuery._processSingleNodeResults = function(id, resultsNode, node, disa
 
 MicrographQuery.prototype._applyResultFilter = function(toReturn, callback) {
     var nextFilter = this.filter.shift();
+    var continuation, continuationFunction;
     var filterType = nextFilter[0];
-    var continuation = (nextFilter.length === 3);
-    var continuationFunction = nextFilter[1];
+
+    if(filterType === 'reduce') {
+	var continuation = (nextFilter.length === 4);
+	var continuationFunction = nextFilter[2];
+    } else {
+	var continuation = (nextFilter.length === 3);
+	var continuationFunction = nextFilter[1];
+    }
+
+
     if(continuation !== true) {	
 	if(filterType === 'reduce') {
 	    continuationFunction = function(acum, item, k) {
-		k(nextFilter[1](acum,item));
+		k(nextFilter[2](acum,item));
 	    };
 	} else {
 	    continuationFunction = function(item, k) {
@@ -1016,7 +1064,7 @@ MicrographQuery.prototype._applyResultFilter = function(toReturn, callback) {
 	    k(floop,env);
 	});
 
-
+	// actual invocation
 	continuationFunction.apply(that,args);
 
     }, function(env) {
